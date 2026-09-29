@@ -1,0 +1,25 @@
+# Reference-guided object replacement.
+#
+#   real source video + reference image + instruction
+#     -> the target object is replaced by the reference object,
+#        everything else in the video is preserved.
+#
+# PLACEHOLDER: no media has been added yet. Fill in the null fields before
+# running. Once runs exist, this definition must not change; create
+# object_replacement_02.yaml instead.
+#
+# Paths are relative to the project root. Source files live in
+# benchmarks/inputs/, reference images in benchmarks/references/.
+
+benchmark_id: object_replacement_01
+
+source_video: null        # e.g. benchmarks/inputs/<clip>.mp4
+reference_images: []      # e.g. [benchmarks/references/<object>.png]
+
+prompt: null              # the edit instruction
+negative_prompt: null
+
+target_object: null       # which object in the source video is replaced
+preserve_regions: []      # free-text regions that must stay unchanged
+
+notes: ""

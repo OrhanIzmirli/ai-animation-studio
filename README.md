@@ -21,7 +21,16 @@ evaluates the output, diagnoses what failed and where, repairs only that part,
 and evaluates again. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
-## Current status: Phase 0 — Engineering foundation
+## Current status: Phase 1A — Multi-backend benchmark infrastructure
+
+Backend interface, benchmark runner, YAML benchmark definitions and human
+evaluation schema. Candidate backends are placeholders; no model is installed.
+See [docs/PHASE_1_BENCHMARK.md](docs/PHASE_1_BENCHMARK.md).
+
+> No modification is considered an improvement until it beats the previous
+> version on the fixed benchmark suite.
+
+## Phase 0 — Engineering foundation
 
 Phase 0 contains **no AI models**. It provides:
 
@@ -34,17 +43,19 @@ Phase 0 contains **no AI models**. It provides:
 
 ```
 src/ai_studio/
-  generation/     replaceable generation backends (future)
+  generation/     backend interface + placeholder adapters (Phase 1A)
   segmentation/   masks / regions to preserve or repair (future)
   tracking/       tracking regions across frames (future)
   quality/        modular quality evaluators (future)
   repair/         local repair (future)
   pipeline/       orchestration of the stages (future)
-  benchmarking/   benchmark result schema + logger (Phase 0)
+  benchmarking/   schemas, logger, environment capture, runner (Phase 0-1A)
 benchmarks/
+  definitions/    fixed benchmark definitions (YAML)
   inputs/         original input files — never modified
   references/     reference assets (character sheets, style refs, ...)
-  results/        one JSON file per run — never overwritten
+  results/        one JSON file per run (success or failure) — never overwritten
+  evaluations/    human ratings, one file per evaluator and revision
 configs/          configuration (quality thresholds, later backends)
 scripts/          command-line entry points (future)
 tests/            unit tests
@@ -86,6 +97,9 @@ Generic fields (`seed`, `guidance`, `gpu`, ...) are for querying across
 backends. Backend-specific settings go in `model_parameters`; the machine and
 software versions go in `environment`. Neither dict has a fixed shape, so no
 single model's fields are hardcoded into the schema.
+
+Relative paths anywhere in the project are relative to the project root, not
+the current directory (override with `AI_STUDIO_ROOT`).
 
 ## Engineering rules
 

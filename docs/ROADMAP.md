@@ -4,11 +4,15 @@ Each phase starts only after the previous one is reviewed and explicitly
 approved. Within a phase, make one architectural change at a time and
 benchmark it.
 
-## Phase 0 — Engineering foundation *(current)*
+## Phase 0 — Engineering foundation *(done, commit 2a592df)*
 Project layout, benchmark result schema, JSON benchmark logger, placeholder
 quality config, tests, documentation. No AI models.
 
-## Phase 1 — Maximum-quality video generation benchmark
+## Phase 1 — Maximum-quality video generation benchmark *(current: 1A)*
+- **1A** — model-agnostic benchmark infrastructure (backend interface, runner,
+  YAML definitions, human evaluation schema). No models installed.
+  See [PHASE_1_BENCHMARK.md](PHASE_1_BENCHMARK.md).
+
 Integrate a first generation backend behind a replaceable interface. Establish
 reproducible baseline runs and log every run with full parameters. Optimise
 for quality, not speed.

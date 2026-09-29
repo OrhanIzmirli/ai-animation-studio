@@ -13,6 +13,21 @@ two free-form dicts so the core schema never hardcodes any one model:
   scheduler, steps, cfg/guidance, denoise strength, model-specific options.
 - environment: where the run happened, e.g. os, python_version, cuda_version,
   torch_version, gpu_driver, gpu_model, vram_gb, git_commit, library versions.
+
+Schema history:
+  1  initial
+  2  + model_parameters, environment
+  3  + backend, backend_version, input_checksums; fps/frame_count may be None
+  4  + status, failure_stage, error_type, error_message (failed runs are
+       recorded too); + validation/prepare/verification/total timing.
+       Older files load as status="success": v1-v3 only recorded successes.
+  5  + output_video: project-relative POSIX path of the generated video.
+       Required for successful v5+ records; may be None for failed runs.
+       Migration: none needed. v1-v4 files load with output_video=None and
+       keep their original schema_version, so the requirement does not
+       apply to them; they are never rewritten (results are immutable).
+       human_rating is DEPRECATED (kept so v1-v4 files still load): new
+       ratings go through HumanEvaluationStore, and the runner never sets it.
 """
 
 from __future__ import annotations
@@ -21,7 +36,23 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 5
+
+STATUSES = ("success", "failed")
+FAILURE_STAGES = ("validation", "prepare", "generation", "verification", "logging")
+
+_UNSAFE_FILE_NAME_CHARS = '/\\:*?"<>|'
+
+
+def check_file_name_safe(name: str, value: str) -> None:
+    """Ids are used as file/directory names; reject anything that could escape."""
+    if (
+        not isinstance(value, str)
+        or not value
+        or any(c in value for c in _UNSAFE_FILE_NAME_CHARS)
+        or value in (".", "..")
+    ):
+        raise ValueError(f"{name} must be usable as a file name: {value!r}")
 
 
 @dataclass(frozen=True)
@@ -29,12 +60,28 @@ class Resolution:
     width: int
     height: int
 
+    def __post_init__(self) -> None:
+        for name in ("width", "height"):
+            value = getattr(self, name)
+            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                raise ValueError(f"resolution {name} must be a positive int")
+
 
 @dataclass(frozen=True, kw_only=True)
 class BenchmarkResult:
     # Identity
     benchmark_id: str
     run_id: str
+
+    # Outcome
+    status: str = "success"
+    failure_stage: str | None = None
+    error_type: str | None = None
+    error_message: str | None = None
+
+    # Backend that ran the model (an upstream adapter or our own fork)
+    backend: str | None = None
+    backend_version: str | None = None
 
     # Model parameters (required, never defaulted)
     model: str
@@ -50,21 +97,32 @@ class BenchmarkResult:
     negative_prompt: str | None = None
     source_video: str | None = None
     reference_assets: list[str] = field(default_factory=list)
+    # path -> sha256; proves runs being compared used identical input files
+    input_checksums: dict[str, str] = field(default_factory=dict)
 
-    # Output format
+    # Output. Project-relative POSIX path when inside the project root.
+    output_video: str | None = None
     resolution: Resolution
-    fps: float
-    frame_count: int
+    fps: float | None = None  # None when unknown
+    frame_count: int | None = None  # None when unknown
 
     # Hardware and cost
     gpu: str | None = None
     vram_gb: float | None = None
+    # Timing breakdown. prepare = cold start (model load); generation = inference.
+    validation_time_seconds: float | None = None
+    prepare_time_seconds: float | None = None
     generation_time_seconds: float | None = None
+    verification_time_seconds: float | None = None
+    total_time_seconds: float | None = None
     estimated_cost_usd: float | None = None
     environment: dict[str, Any] = field(default_factory=dict)
 
     # Evaluation
     quality_metrics: dict[str, float] = field(default_factory=dict)
+    # DEPRECATED since v5 - never written by the runner. Human ratings live in
+    # benchmarks/evaluations/ via HumanEvaluationStore. Kept only so v1-v4
+    # records still load.
     human_rating: float | None = None
     notes: str = ""
 
@@ -79,17 +137,36 @@ class BenchmarkResult:
                 raise ValueError(f"{name} must be a non-empty string")
         if not isinstance(self.seed, int) or isinstance(self.seed, bool):
             raise ValueError("seed must be an int")
-        if self.resolution.width <= 0 or self.resolution.height <= 0:
-            raise ValueError("resolution must be positive")
-        if self.fps <= 0:
+        if self.fps is not None and self.fps <= 0:
             raise ValueError("fps must be positive")
-        if self.frame_count <= 0:
+        if self.frame_count is not None and self.frame_count <= 0:
             raise ValueError("frame_count must be positive")
         for name in ("benchmark_id", "run_id"):
+            check_file_name_safe(name, getattr(self, name))
+        if self.status not in STATUSES:
+            raise ValueError(f"status must be one of {STATUSES}")
+        if self.status == "failed":
+            if self.failure_stage not in FAILURE_STAGES:
+                raise ValueError(f"failed run needs failure_stage in {FAILURE_STAGES}")
+            if not self.error_type:
+                raise ValueError("failed run needs error_type")
+        elif any((self.failure_stage, self.error_type, self.error_message)):
+            raise ValueError("successful run must not have failure fields")
+        elif self.schema_version >= 5 and not self.output_video:
+            raise ValueError("successful run must have output_video")
+        if self.output_video is not None:
+            if not isinstance(self.output_video, str) or not self.output_video.strip():
+                raise ValueError("output_video must be a non-empty string or None")
+            if "\\" in self.output_video:
+                raise ValueError(f"output_video must use forward slashes: {self.output_video!r}")
+        for name in (
+            "validation_time_seconds", "prepare_time_seconds", "generation_time_seconds",
+            "verification_time_seconds", "total_time_seconds",
+        ):
             value = getattr(self, name)
-            if any(c in value for c in '/\\:*?"<>|') or value in (".", ".."):
-                raise ValueError(f"{name} must be usable as a file name: {value!r}")
-        for name in ("model_parameters", "environment"):
+            if value is not None and value < 0:
+                raise ValueError(f"{name} must be >= 0")
+        for name in ("model_parameters", "environment", "input_checksums"):
             if not isinstance(getattr(self, name), dict):
                 raise ValueError(f"{name} must be a dict")
 

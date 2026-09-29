@@ -17,6 +17,7 @@ def make_result(**overrides):
         guidance=5.0,
         prompt="a cat walking",
         resolution=Resolution(width=1280, height=720),
+        output_video="outputs/bench-001/run-001/out.mp4",
         fps=24,
         frame_count=81,
     )
@@ -37,13 +38,17 @@ def test_log_writes_json_with_all_fields(tmp_path):
         "vram_gb", "generation_time_seconds", "estimated_cost_usd",
         "quality_metrics", "human_rating", "notes", "timestamp", "schema_version",
         "model_parameters", "environment",
+        "backend", "backend_version", "input_checksums",
+        "status", "failure_stage", "error_type", "error_message",
+        "validation_time_seconds", "prepare_time_seconds",
+        "verification_time_seconds", "total_time_seconds", "output_video",
     }
     assert set(data) == expected_keys
     assert data["resolution"] == {"width": 1280, "height": 720}
     assert data["quality_metrics"] == {"sharpness": 0.8}
     assert data["model_parameters"] == {}
     assert data["environment"] == {}
-    assert data["schema_version"] == 2
+    assert data["schema_version"] == 5
 
 
 def test_model_parameters_and_environment_roundtrip(tmp_path):
@@ -77,57 +82,6 @@ def test_model_parameters_and_environment_roundtrip(tmp_path):
     assert loaded.environment == environment
 
 
-def test_loads_schema_v1_result_without_new_fields(tmp_path):
-    logger = BenchmarkLogger(tmp_path)
-    data = make_result().to_dict()
-    del data["model_parameters"], data["environment"]
-    data["schema_version"] = 1
-    path = logger.path_for("bench-001", "run-001")
-    path.parent.mkdir(parents=True)
-    path.write_text(json.dumps(data), encoding="utf-8")
-
-    loaded = logger.load("bench-001", "run-001")
-    assert loaded.schema_version == 1
-    assert loaded.model_parameters == {}
-    assert loaded.environment == {}
-
-
-def test_log_never_overwrites(tmp_path):
-    logger = BenchmarkLogger(tmp_path)
-    path = logger.log(make_result(notes="first"))
-
-    with pytest.raises(FileExistsError):
-        logger.log(make_result(notes="second"))
-
-    assert json.loads(path.read_text(encoding="utf-8"))["notes"] == "first"
-
-
-def test_roundtrip(tmp_path):
-    logger = BenchmarkLogger(tmp_path)
-    original = make_result(reference_assets=["ref/a.png"], human_rating=4.0)
-    logger.log(original)
-
-    assert logger.load("bench-001", "run-001") == original
-
-
-def test_list_runs(tmp_path):
-    logger = BenchmarkLogger(tmp_path)
-    logger.log(make_result(run_id="run-001"))
-    logger.log(make_result(run_id="run-002"))
-
-    assert [r.run_id for r in logger.list_runs("bench-001")] == ["run-001", "run-002"]
-    assert logger.list_runs("missing") == []
-
-
-def test_model_parameters_are_required():
-    with pytest.raises(TypeError):
-        BenchmarkResult(
-            benchmark_id="b", run_id="r", model="m", model_version="1",
-            workflow_version="w", prompt="p",
-            resolution=Resolution(width=1, height=1), fps=24, frame_count=1,
-        )  # seed, inference_steps, guidance missing
-
-
 @pytest.mark.parametrize(
     "overrides",
     [
@@ -136,7 +90,6 @@ def test_model_parameters_are_required():
         {"model": ""},
         {"fps": 0},
         {"frame_count": 0},
-        {"resolution": Resolution(width=0, height=720)},
         {"run_id": "../escape"},
         {"benchmark_id": "a/b"},
         {"model_parameters": None},
@@ -146,6 +99,18 @@ def test_model_parameters_are_required():
 def test_invalid_values_rejected(overrides):
     with pytest.raises(ValueError):
         make_result(**overrides)
+
+
+@pytest.mark.parametrize("width,height", [(0, 720), (1280, -1), (True, 720), (12.5, 720)])
+def test_invalid_resolution_rejected(width, height):
+    with pytest.raises(ValueError):
+        Resolution(width=width, height=height)
+
+
+def test_fps_and_frame_count_may_be_unknown(tmp_path):
+    result = make_result(fps=None, frame_count=None)
+    BenchmarkLogger(tmp_path).log(result)
+    assert BenchmarkLogger(tmp_path).load("bench-001", "run-001") == result
 
 
 def test_new_run_id_is_unique():

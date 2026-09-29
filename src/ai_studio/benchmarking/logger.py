@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ai_studio.benchmarking.schema import BenchmarkResult
+from ai_studio.paths import resolve_path
 
 
 def new_run_id() -> str:
@@ -24,7 +25,8 @@ def new_run_id() -> str:
 
 class BenchmarkLogger:
     def __init__(self, results_dir: str | Path) -> None:
-        self.results_dir = Path(results_dir)
+        # Relative directories are relative to the project root, not the cwd.
+        self.results_dir = resolve_path(results_dir)
 
     def path_for(self, benchmark_id: str, run_id: str) -> Path:
         return self.results_dir / benchmark_id / f"{run_id}.json"
