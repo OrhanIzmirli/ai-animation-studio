@@ -1,0 +1,27 @@
+# Quality Gate configuration — PLACEHOLDERS ONLY.
+#
+# No thresholds are defined yet. Every value is null on purpose: thresholds
+# will be set from Phase 1+ benchmark data, one change at a time, never guessed.
+# A null threshold means "not evaluated".
+
+version: 1
+
+video:
+  sharpness_min: null
+  temporal_consistency_min: null
+  flicker_max: null
+  artifact_score_max: null
+
+prompt_adherence:
+  text_video_alignment_min: null
+
+preservation:          # Phase 2: regions that must stay unchanged
+  masked_region_change_max: null
+
+anime:                 # Phase 5-6: anime-specific consistency
+  character_identity_similarity_min: null
+  line_art_stability_min: null
+  color_palette_drift_max: null
+
+human:
+  rating_min: null

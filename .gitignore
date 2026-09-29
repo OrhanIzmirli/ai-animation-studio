@@ -1,0 +1,70 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Environment variables / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- AI model weights and caches ---
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.onnx
+*.gguf
+*.engine
+models/
+checkpoints/
+weights/
+.cache/
+hf_cache/
+
+# --- Generated media ---
+outputs/*
+!outputs/.gitkeep
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.avi
+*.gif
+
+# Benchmark inputs/references are often large media: keep them out of git,
+# but keep the folders. Benchmark result JSON files ARE committed.
+benchmarks/inputs/*
+!benchmarks/inputs/.gitkeep
+benchmarks/references/*
+!benchmarks/references/.gitkeep
+
+# --- Temporary files ---
+tmp/
+temp/
+*.tmp
+*.log
+*.swp
+*~
+
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
