@@ -3,7 +3,8 @@ from pathlib import Path
 import pytest
 
 from ai_studio.benchmarking import BenchmarkLogger, BenchmarkRequest, BenchmarkRunner, Resolution
-from ai_studio.generation.backends import BackendMetadata, VideoEditingBackend
+from ai_studio.generation.backends import BackendMetadata, VideoEditingBackend, VideoGenerationBackend
+from ai_studio.generation.request import VideoGenerationRequest
 from ai_studio.generation.result import GenerationResult
 
 FAKE_ENVIRONMENT = {
@@ -139,3 +140,67 @@ def runner(project):
         environment_collector=lambda: dict(FAKE_ENVIRONMENT),
         root=project,
     )
+
+
+# --- video generation fakes ---
+
+class FakeGenerationBackend(VideoGenerationBackend):
+    """Model-free generation backend: writes a small fake video file."""
+
+    def __init__(self, *, fail_in=None, exc=None, output_name="gen.mp4"):
+        self.fail_in, self.exc, self.output_name = fail_in, exc, output_name
+        self.calls = []
+        self.received = None
+
+    def metadata(self):
+        return BackendMetadata(
+            backend_name="fake-gen", backend_version="1.0", model_name="fake-t2v",
+            model_version="3.0", workflow_version="wf-gen-1",
+        )
+
+    def validate_inputs(self, request):
+        self.calls.append("validate_inputs")
+
+    def prepare(self):
+        self.calls.append("prepare")
+        if self.fail_in == "prepare":
+            raise self.exc
+
+    def generate(self, request, output_dir):
+        self.calls.append("generate")
+        self.received = request
+        if self.fail_in == "generate":
+            raise self.exc
+        output = Path(output_dir) / self.output_name
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"generated video bytes")
+        fps = request.fps or 16
+        return GenerationResult(
+            output_video=str(output), backend_name="fake-gen", backend_version="1.0",
+            model_name="fake-t2v", model_version="3.0",
+            parameters={**request.backend_parameters, "sampler": "fake"},
+            fps=fps, frame_count=round(request.duration_seconds * fps),
+        )
+
+
+@pytest.fixture
+def generation_request_factory(input_files):
+    _, reference = input_files
+
+    def make(**overrides):
+        fields = dict(
+            prompt="a young man sits on a rooftop ledge at sunset, graphic novel style",
+            negative_prompt="photorealistic",
+            reference_images=[str(reference)],
+            duration_seconds=5,
+            fps=24,
+            output_resolution=Resolution(width=1280, height=720),
+            seed=7,
+            camera_motion="slow push-in",
+            subject_motion=["mostly stationary", "slight head turn"],
+            visual_direction={"style": "graphic novel", "line": "strong ink contours"},
+        )
+        fields.update(overrides)
+        return VideoGenerationRequest(**fields)
+
+    return make

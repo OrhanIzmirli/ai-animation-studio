@@ -1,0 +1,51 @@
+{
+  "benchmark_id": "object_replacement_01",
+  "run_id": "20260930T090000Z-aaaa0009",
+  "model": "legacy-model",
+  "model_version": "1.0",
+  "workflow_version": "wf-1",
+  "seed": 42,
+  "inference_steps": 30,
+  "guidance": 5.0,
+  "prompt": "a cat walking",
+  "negative_prompt": null,
+  "source_video": "benchmarks/inputs/cat.mp4",
+  "reference_assets": [],
+  "resolution": {
+    "width": 1280,
+    "height": 720
+  },
+  "fps": null,
+  "frame_count": null,
+  "gpu": "RTX 4090",
+  "vram_gb": 24.0,
+  "generation_time_seconds": 12.0,
+  "estimated_cost_usd": null,
+  "quality_metrics": {},
+  "human_rating": null,
+  "notes": "",
+  "timestamp": "2026-09-30T09:00:00+00:00",
+  "schema_version": 6,
+  "model_parameters": {
+    "sampler": "euler"
+  },
+  "environment": {
+    "os": "Linux"
+  },
+  "backend": "fake",
+  "backend_version": "1.0",
+  "input_checksums": {
+    "benchmarks/inputs/cat.mp4": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "status": "failed",
+  "failure_stage": "generation",
+  "error_type": "torch.OutOfMemoryError",
+  "error_message": "CUDA out of memory. Tried to allocate 2.00 GiB",
+  "validation_time_seconds": 0.5,
+  "prepare_time_seconds": 40.0,
+  "verification_time_seconds": null,
+  "total_time_seconds": 52.5,
+  "output_video": null,
+  "task_type": "video_editing",
+  "task_parameters": {}
+}

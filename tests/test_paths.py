@@ -80,6 +80,8 @@ def make_project(root: Path) -> None:
     (root / "benchmarks" / "references" / "teapot.png").write_bytes(b"image")
     (root / "benchmarks" / "definitions" / "swap.yaml").write_text(
         "benchmark_id: swap_01\n"
+        "task_type: video_editing\n"
+        "status: ready\n"
         "source_video: benchmarks/inputs/clip.mp4\n"
         "reference_images: [benchmarks/references/teapot.png]\n"
         "prompt: replace the mug with the teapot\n",

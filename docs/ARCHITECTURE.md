@@ -1,6 +1,45 @@
 # Architecture
 
-> Status: design only. Nothing below is implemented except benchmark logging.
+> Status: the capability contracts and the benchmark infrastructure are
+> implemented; the production pipeline (router, Quality Gate, repair) is not.
+
+## Studio engine: capabilities
+
+```
+STUDIO ENGINE
+│
+├── VIDEO GENERATION     Text / Image / References          → New Video
+│     contract: VideoGenerationBackend    request: VideoGenerationRequest
+│
+├── VIDEO EDITING        Source Video / References / Instruction → Edited Video
+│     contract: VideoEditingBackend       request: BenchmarkRequest (EditRequest later)
+│
+└── VIDEO REPAIR         Video / Frames / Region             → Repaired Video
+      (future — not implemented)
+```
+
+Each capability has its own request type and backend contract
+(`src/ai_studio/generation/`). A backend declares its capabilities by the
+contracts it implements. A model that naturally does both generation and
+editing implements both contracts; a model that only edits implements only
+the editing contract.
+
+**Models are selected by capability and by benchmark performance.** We do not
+force a model into a universal interface it does not naturally support, e.g.
+faking a source video to make a text-to-video model look like an editor, or
+feeding a blank prompt to an editor to make it "generate". The best
+generation model and the best editing model may be different models. Each is
+chosen from its own benchmark results.
+
+What stays common to all capabilities is the infrastructure around the model.
+One `BenchmarkRunner` handles every capability: input validation, checksums,
+timing, environment capture, output verification, failure recording and
+logging are shared. It checks that the backend declares the request's
+capability, and it never looks at model-specific details.
+
+Adding `VIDEO_REPAIR` later means adding a `Capability` member, a request type
+and a `VideoRepairBackend` contract. The runner and record schema already
+carry `task_type`.
 
 ## Future pipeline
 
@@ -23,7 +62,7 @@ benchmarks); a clip that still fails after that is flagged for human review.
 
 | Stage | Package | Responsibility |
 |---|---|---|
-| Generate | `src/ai_studio/generation` | Produce a clip from intent, prompt and references. Backends are replaceable behind one interface. |
+| Generate / Edit | `src/ai_studio/generation` | Produce or edit a clip. Backends are replaceable behind one contract per capability. |
 | Segment / Track | `src/ai_studio/segmentation`, `src/ai_studio/tracking` | Locate regions across frames: what to preserve, what to repair. |
 | Quality Gate | `src/ai_studio/quality` | Run modular evaluators, compare metrics to `configs/quality.yaml`, return pass/fail per check. |
 | Diagnose | `src/ai_studio/quality` / `src/ai_studio/repair` | Turn failed checks into located defects (which frames, which region, what kind). |
@@ -33,8 +72,13 @@ benchmarks); a clip that still fails after that is flagged for human review.
 
 ## Requests: benchmark layer vs. production layer
 
-`BenchmarkRequest` (`src/ai_studio/benchmarking/request.py`) is a
-**benchmark-layer object**. It combines the edit itself (source video,
+**Generation** already follows the target design: `VideoGenerationRequest`
+(`src/ai_studio/generation/request.py`) contains no benchmark metadata. The
+runner receives `benchmark_id` separately, so the same request type can be
+used by the production pipeline.
+
+**Editing** still uses `BenchmarkRequest` (`src/ai_studio/benchmarking/request.py`),
+which is a **benchmark-layer object**. It combines the edit itself (source video,
 references, prompt, output resolution, backend parameters) with experiment
 metadata (`benchmark_id`, a fixed seed).
 

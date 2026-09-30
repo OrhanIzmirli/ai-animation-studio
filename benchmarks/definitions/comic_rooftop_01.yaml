@@ -1,0 +1,78 @@
+# Comic animation benchmark 01 — single character on a rooftop.
+# Difficulty: Level 1 (stationary character + slow camera).
+# Full specification and success criteria: docs/BENCHMARK_COMIC_ROOFTOP_01.md
+#
+# Tests whether a video pipeline can keep ONE character and a graphic-novel /
+# hybrid 2D-3D look stable across a ~5 second shot.
+#
+# PLACEHOLDER INPUTS: the character reference images do not exist yet.
+# Once runs exist, this definition must not change; create
+# comic_rooftop_02.yaml instead.
+#
+# Paths are relative to the project root.
+# No copyrighted character names, titles, logos or franchise costumes.
+
+benchmark_id: comic_rooftop_01
+task_type: video_generation   # new video from text + references; no source video
+status: draft                 # change to ready only by explicit human decision,
+                              # once the COMIC_HERO_01 reference sheet is final
+
+# COMIC_HERO_01 character sheet. Files to be created; see
+# benchmarks/references/comic_hero_01/README.md. Not listed yet because the
+# runner requires every listed reference file to exist.
+reference_images: []
+#  - benchmarks/references/comic_hero_01/front.png
+#  - benchmarks/references/comic_hero_01/three_quarter.png
+#  - benchmarks/references/comic_hero_01/profile.png
+#  - benchmarks/references/comic_hero_01/style_frame.png
+
+prompt: >-
+  Graphic novel style animated shot, hybrid 2D and 3D animation. A young man
+  with short messy black hair, wearing a dark charcoal hooded jacket over a
+  plain light-grey t-shirt, dark cargo trousers and worn white sneakers, sits
+  on the edge of a high rooftop ledge overlooking a dense city at late sunset,
+  city lights beginning to glow. Subtle wind moves his hair and jacket. He
+  stays mostly still, looking out over the city; near the end he slowly turns
+  his head slightly toward the camera. Slow cinematic camera push-in from a
+  low three-quarter angle behind him. Strong ink contours, controlled cel
+  shading, halftone print texture, hand-drawn hatching in the shadows, layered
+  city background with depth, cinematic perspective, limited stepped animation
+  timing. Consistent face, consistent clothing design, stable architecture.
+
+negative_prompt: >-
+  photorealistic, live action, 3D render look, glossy plastic shading, soft
+  airbrushed gradients, blurry, motion blur smear, flickering lines, boiling
+  line art, morphing face, changing hairstyle, changing clothing, extra limbs,
+  deformed hands, warping buildings, melting architecture, text, logo,
+  watermark, signature, speech bubbles, mask, superhero costume
+
+# --- structured shot controls (generic; backends map them as they can) ---
+
+duration_seconds: 5
+
+camera_motion: slow cinematic push-in from a low three-quarter angle behind the character
+
+subject_motion:
+  - character sits on the rooftop ledge and remains mostly stationary
+  - subtle wind moves hair and clothing
+  - near the end, a slight head turn toward the camera
+
+visual_direction:
+  - graphic novel aesthetic
+  - hybrid 2D/3D animation
+  - strong ink contours
+  - controlled cel shading
+  - halftone print texture
+  - hand-drawn hatch details
+  - layered city background
+  - cinematic perspective
+  - intentional limited/stepped animation feel
+  - stable facial structure
+  - stable clothing design
+  - stable background geometry
+
+notes: |
+  character: COMIC_HERO_01
+  difficulty_level: 1 (stationary character + slow camera)
+  time_of_day: late sunset, city lights starting to glow
+  evaluation: ComicAnimationEvaluation (experimental, 1-10, higher is better)

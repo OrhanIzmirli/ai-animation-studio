@@ -1,14 +1,39 @@
-# Phase 1 — Multi-Backend Video Editing Benchmark
+# Phase 1 — Multi-Backend Video Benchmark
 
 > ## Engineering rule
 >
 > **No modification is considered an improvement until it beats the previous
 > version on the fixed benchmark suite.**
 
-Phase 1A (this document's current scope) builds only the infrastructure:
-backend interface, request/result schemas, environment capture, runner,
-YAML benchmark definitions and the human evaluation schema. No model is
-installed yet.
+Phase 1A built the infrastructure: backend interface, request/result
+schemas, environment capture, runner, YAML benchmark definitions and the
+human evaluation schema. Phase 1B adds a second capability, **video
+generation**, beside video editing. No model is installed yet.
+
+## Two capabilities, benchmarked separately
+
+| `task_type` | Input | Request | Backend contract |
+|---|---|---|---|
+| `video_editing` | source video + references + instruction | `BenchmarkRequest` | `VideoEditingBackend` |
+| `video_generation` | prompt + references + shot controls, **no source video** | `VideoGenerationRequest` | `VideoGenerationBackend` |
+
+Every benchmark definition declares its `task_type` explicitly. The two
+capabilities are ranked **separately**: which open models are best at
+generation is a different question from which are best at editing, and
+neither is assumed from the other. The editing candidates (JoyAI-Video-Edit,
+Kiwi-Edit, Wan 2.2 VACE-Fun + EditCtrl) are declared editing-only until
+verified. Generation candidates are still to be researched.
+
+Generation definitions carry structured shot controls: `duration_seconds`,
+`camera_motion`, `subject_motion`, `visual_direction`. Each control is a
+generic string, list or mapping, never a model-specific field. They are
+recorded with every run in `task_parameters`. Run a generation definition
+with:
+
+```python
+request = definition.to_request(seed=..., output_resolution=..., fps=...)
+runner.run(request, backend, benchmark_id=definition.benchmark_id)
+```
 
 ## Why multiple backends
 
@@ -56,6 +81,14 @@ Every backend receives exactly the same definition. The runner records a
 SHA-256 checksum of every input file with each run, so it is provable that
 compared runs used byte-identical inputs, and it aborts if a backend modifies
 an input.
+
+**Lifecycle.** Every definition has `status: draft` (the default) or
+`status: ready`. `BenchmarkRunner.run_definition()` refuses drafts before
+anything runs: no backend call, no output directory, no record.
+`to_request()` also refuses them. Changing `draft` to `ready` is an explicit
+human edit of the YAML file, made once the inputs are final. Readiness is
+never inferred from whether files exist. Definitions written before this
+field existed load as drafts.
 
 Once runs exist for a definition, the definition is frozen. A changed input or
 prompt is a new benchmark (`object_replacement_02`), never an edit.
@@ -208,14 +241,35 @@ added later with their defaults.
 | 3 | + `backend`, `backend_version`, `input_checksums`; `fps`/`frame_count` optional | `null` / empty |
 | 4 | + `status`, `failure_stage`, `error_type`, `error_message`; per-stage timings | `status: success` (v1–v3 only recorded successes), timings `null` |
 | 5 | + `output_video`; `human_rating` deprecated | `output_video: null` |
+| 6 | + `task_type` (required), `task_parameters` | `task_type: null` (unknown), `task_parameters: {}` |
 
 v5 migration: no action is needed. From v5 on, a successful record **must**
 have `output_video`; the rule is checked only for records with
 `schema_version >= 5`, so v1–v4 successes without it remain valid. For older
 runs, the video can still be found under `outputs/<benchmark_id>/<run_id>/`.
 
+v6 migration: no action is needed. Generation runs have no source video and
+carry shot controls, so a record must say which task it was and keep those
+controls to be reproducible. `task_type` is required for records with
+`schema_version >= 6`. Older records keep `task_type: null`. v3–v5 runner
+records were all editing runs; v1–v2 were logged by hand.
+
 Frozen example records for every version live in `tests/fixtures/schema/`
 and must keep loading. Never edit them; add a new fixture for a new version.
+
+## Reference assets are external dependencies
+
+Benchmark media (source videos, reference images, character sheets) is
+git-ignored. It is an **external reproducibility dependency** of every run:
+the repository holds the definition and the run records, and each record
+holds a SHA-256 checksum of every input file. Anyone reproducing a run must
+obtain byte-identical files and can verify them against those checksums.
+
+No Git LFS or cloud storage is used yet. Shared object storage for benchmark
+media will be introduced before multi-machine benchmark reproduction becomes
+necessary (e.g. before the first rented-GPU run that must be compared with a
+local run). Until then, never edit or replace a media file that a run has
+used. Add a new file under a new name instead.
 
 ## Upstream backends vs. our forks
 
@@ -234,8 +288,11 @@ upstream backend and our modified fork are **separate benchmarkable versions**:
 ## Adding a backend
 
 1. Create `src/ai_studio/generation/backends/<name>.py` with a subclass of
-   `VideoEditingBackend` implementing `metadata()`, `validate_inputs()`,
-   `prepare()` and `generate()`.
+   the contract(s) the model **naturally** supports: `VideoGenerationBackend`,
+   `VideoEditingBackend`, or both, dispatching on the request type in
+   `generate()`. Implement `metadata()`, `validate_inputs()`, `prepare()` and
+   `generate()`. Capabilities follow from the contracts; never claim one the
+   model does not really have.
 2. Read model-specific settings from `request.backend_parameters`; return the
    full effective parameters in `GenerationResult.parameters`.
 3. Write the output inside the `output_dir` the runner provides. Input paths

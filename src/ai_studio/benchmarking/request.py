@@ -15,15 +15,23 @@ accept EditRequest. Not implemented yet - see docs/ARCHITECTURE.md.
 
 from __future__ import annotations
 
+import dataclasses
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar
 
 from ai_studio.benchmarking.schema import Resolution, check_file_name_safe
+from ai_studio.generation.capabilities import Capability
 
 
 @dataclass(frozen=True, kw_only=True)
 class BenchmarkRequest:
+    """Video EDITING request (source video required). For generation, see
+    ai_studio.generation.request.VideoGenerationRequest."""
+
+    capability: ClassVar[Capability] = Capability.VIDEO_EDITING
+
     benchmark_id: str
     source_video: str
     prompt: str
@@ -56,6 +64,19 @@ class BenchmarkRequest:
         except (TypeError, ValueError) as e:
             raise ValueError(f"backend_parameters must be JSON-serializable: {e}") from None
 
+    # --- task-request protocol used by BenchmarkRunner ---
+
     @property
     def input_paths(self) -> list[str]:
         return [self.source_video, *self.reference_images]
+
+    def with_resolved_paths(self, resolve: Callable[[str], str]) -> BenchmarkRequest:
+        return dataclasses.replace(
+            self,
+            source_video=resolve(self.source_video),
+            reference_images=[resolve(p) for p in self.reference_images],
+        )
+
+    def task_parameters(self) -> dict[str, Any]:
+        """Editing has no task-level fields beyond the generic record columns."""
+        return {}

@@ -43,7 +43,7 @@ Phase 0 contains **no AI models**. It provides:
 
 ```
 src/ai_studio/
-  generation/     backend interface + placeholder adapters (Phase 1A)
+  generation/     capability contracts, requests, placeholder adapters
   segmentation/   masks / regions to preserve or repair (future)
   tracking/       tracking regions across frames (future)
   quality/        modular quality evaluators (future)
@@ -55,7 +55,8 @@ benchmarks/
   inputs/         original input files — never modified
   references/     reference assets (character sheets, style refs, ...)
   results/        one JSON file per run (success or failure) — never overwritten
-  evaluations/    human ratings, one file per evaluator and revision
+  evaluations/    human ratings (editing), one file per evaluator and revision
+  comic_evaluations/  experimental comic ratings (generation)
 configs/          configuration (quality thresholds, later backends)
 scripts/          command-line entry points (future)
 tests/            unit tests

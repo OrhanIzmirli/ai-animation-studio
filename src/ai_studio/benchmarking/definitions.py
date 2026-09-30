@@ -1,8 +1,15 @@
 """Benchmark definitions loaded from YAML (benchmarks/definitions/*.yaml).
 
-A definition fixes WHAT is tested (source, references, instruction). Per-run
-choices (seed, output resolution, backend parameters) are supplied when it is
-turned into a BenchmarkRequest.
+A definition fixes WHAT is tested and declares its task_type explicitly:
+  video_editing     source video + references + instruction -> BenchmarkRequest
+  video_generation  prompt + references + shot controls     -> VideoGenerationRequest
+Per-run choices (seed, output resolution, fps, backend parameters) are
+supplied when it is turned into a request.
+
+Lifecycle: every definition has a status, "draft" (the default) or "ready".
+Only ready definitions can be turned into requests or run. Changing
+draft -> ready is an explicit human edit of the YAML file; readiness is never
+inferred from whether input files exist.
 
 Media paths inside a definition are relative to the PROJECT ROOT (see
 ai_studio.paths), e.g. "benchmarks/inputs/clip.mp4" — never to the cwd.
@@ -19,31 +26,75 @@ from typing import Any
 import yaml
 
 from ai_studio.benchmarking.request import BenchmarkRequest
-from ai_studio.benchmarking.schema import Resolution, check_file_name_safe
+from ai_studio.benchmarking.schema import TASK_TYPES, Resolution, check_file_name_safe
+from ai_studio.generation.capabilities import Capability
+from ai_studio.generation.request import ShotControl, VideoGenerationRequest, check_shot_control
 from ai_studio.paths import definitions_dir, resolve_path
+
+
+DEFINITION_STATUSES = ("draft", "ready")
+
+
+class DraftBenchmarkError(RuntimeError):
+    """The benchmark definition is still a draft and must not be run."""
+
+
+EDITING_ONLY_FIELDS = ("source_video", "target_object", "preserve_regions")
+GENERATION_ONLY_FIELDS = ("duration_seconds", "camera_motion", "subject_motion", "visual_direction")
 
 
 @dataclass(frozen=True, kw_only=True)
 class BenchmarkDefinition:
     benchmark_id: str
-    source_video: str | None = None
+    task_type: str  # "video_generation" | "video_editing"; must be explicit
+    status: str = "draft"  # "draft" | "ready"; set to ready only by a human
     reference_images: list[str] = field(default_factory=list)
     prompt: str | None = None
     negative_prompt: str | None = None
+    notes: str = ""
+
+    # video_editing only
+    source_video: str | None = None
     target_object: str | None = None
     preserve_regions: list[str] = field(default_factory=list)
-    notes: str = ""
+
+    # video_generation only (shot controls: string, list of strings or mapping)
+    duration_seconds: float | None = None
+    camera_motion: ShotControl = None
+    subject_motion: ShotControl = None
+    visual_direction: ShotControl = None
 
     def __post_init__(self) -> None:
         check_file_name_safe("benchmark_id", self.benchmark_id)
+        if self.status not in DEFINITION_STATUSES:
+            raise ValueError(f"status must be one of {DEFINITION_STATUSES}, got {self.status!r}")
+        if self.task_type not in TASK_TYPES:
+            raise ValueError(f"task_type must be one of {TASK_TYPES}, got {self.task_type!r}")
         for name in ("reference_images", "preserve_regions"):
             if not isinstance(getattr(self, name), list):
                 raise ValueError(f"{name} must be a list")
+        not_applicable = (
+            GENERATION_ONLY_FIELDS if self.task_type == Capability.VIDEO_EDITING.value
+            else EDITING_ONLY_FIELDS
+        )
+        set_fields = [name for name in not_applicable if getattr(self, name) not in (None, [])]
+        if set_fields:
+            raise ValueError(f"{set_fields} do not apply to task_type {self.task_type!r}")
+        if self.duration_seconds is not None and (
+            not isinstance(self.duration_seconds, (int, float))
+            or isinstance(self.duration_seconds, bool)
+            or self.duration_seconds <= 0
+        ):
+            raise ValueError("duration_seconds must be a positive number")
+        for name in ("camera_motion", "subject_motion", "visual_direction"):
+            check_shot_control(name, getattr(self, name))
 
     @property
     def is_complete(self) -> bool:
         """False while the definition still has placeholders instead of real inputs."""
-        return bool(self.source_video and self.prompt)
+        if self.task_type == Capability.VIDEO_EDITING.value:
+            return bool(self.source_video and self.prompt)
+        return bool(self.prompt and self.duration_seconds)
 
     def to_request(
         self,
@@ -51,19 +102,42 @@ class BenchmarkDefinition:
         seed: int,
         output_resolution: Resolution,
         backend_parameters: dict[str, Any] | None = None,
-    ) -> BenchmarkRequest:
-        if not self.is_complete:
-            raise ValueError(
-                f"benchmark {self.benchmark_id!r} is incomplete: source_video and prompt are required"
+        fps: float | None = None,
+    ) -> BenchmarkRequest | VideoGenerationRequest:
+        """Editing -> BenchmarkRequest; generation -> VideoGenerationRequest
+        (run it with runner.run(request, backend, benchmark_id=definition.benchmark_id))."""
+        if self.status != "ready":
+            raise DraftBenchmarkError(
+                f"benchmark {self.benchmark_id!r} is a draft; set 'status: ready' in its "
+                "definition once its inputs are final (an explicit human decision)"
             )
-        return BenchmarkRequest(
-            benchmark_id=self.benchmark_id,
-            source_video=self.source_video,
-            reference_images=list(self.reference_images),
+        if not self.is_complete:
+            required = "source_video and prompt" if self.task_type == "video_editing" else "prompt and duration_seconds"
+            raise ValueError(f"benchmark {self.benchmark_id!r} is incomplete: {required} are required")
+        if self.task_type == Capability.VIDEO_EDITING.value:
+            if fps is not None:
+                raise ValueError("fps is not an editing request field")
+            return BenchmarkRequest(
+                benchmark_id=self.benchmark_id,
+                source_video=self.source_video,
+                reference_images=list(self.reference_images),
+                prompt=self.prompt,
+                negative_prompt=self.negative_prompt,
+                output_resolution=output_resolution,
+                seed=seed,
+                backend_parameters=dict(backend_parameters or {}),
+            )
+        return VideoGenerationRequest(
             prompt=self.prompt,
             negative_prompt=self.negative_prompt,
+            reference_images=list(self.reference_images),
+            duration_seconds=self.duration_seconds,
+            fps=fps,
             output_resolution=output_resolution,
             seed=seed,
+            camera_motion=self.camera_motion,
+            subject_motion=self.subject_motion,
+            visual_direction=self.visual_direction,
             backend_parameters=dict(backend_parameters or {}),
         )
 
@@ -74,6 +148,8 @@ def load_definition(path: str | Path) -> BenchmarkDefinition:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError(f"{path}: expected a mapping at the top level")
+    if "task_type" not in data:
+        raise ValueError(f"{path}: must declare task_type ({' or '.join(TASK_TYPES)})")
     allowed = {f.name for f in fields(BenchmarkDefinition)}
     unknown = set(data) - allowed
     if unknown:

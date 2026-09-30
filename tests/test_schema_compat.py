@@ -15,13 +15,19 @@ from ai_studio.benchmarking import SCHEMA_VERSION, BenchmarkLogger, BenchmarkRes
 FIXTURES = Path(__file__).parent / "fixtures" / "schema"
 
 
+ALL_FIXTURES = [
+    "v1", "v2", "v3", "v4_success", "v4_failed", "v5_success", "v5_failed",
+    "v6_generation_success", "v6_editing_failed",
+]
+
+
 def load_fixture(name):
     return BenchmarkResult.from_dict(json.loads((FIXTURES / f"{name}.json").read_text(encoding="utf-8")))
 
 
 def test_current_schema_version_has_a_fixture():
-    assert SCHEMA_VERSION == 5
-    assert (FIXTURES / "v5_success.json").is_file()
+    assert SCHEMA_VERSION == 6
+    assert (FIXTURES / "v6_generation_success.json").is_file()
 
 
 def test_v1_loads():
@@ -67,7 +73,7 @@ def test_v4_failed_loads():
     assert record.error_type == "torch.OutOfMemoryError"
 
 
-@pytest.mark.parametrize("name", ["v1", "v2", "v3", "v4_success", "v4_failed", "v5_success", "v5_failed"])
+@pytest.mark.parametrize("name", ALL_FIXTURES)
 def test_every_version_loads_through_logger(tmp_path, name):
     data = json.loads((FIXTURES / f"{name}.json").read_text(encoding="utf-8"))
     target = tmp_path / data["benchmark_id"] / f"{data['run_id']}.json"
@@ -112,8 +118,42 @@ def test_current_success_with_invalid_output_video_rejected(bad):
         BenchmarkResult.from_dict(data)
 
 
+@pytest.mark.parametrize("name", ALL_FIXTURES[:7])
+def test_pre_v6_records_have_no_task_type(name):
+    record = load_fixture(name)
+    assert record.task_type is None and record.task_parameters == {}
+
+
+def test_v6_generation_loads():
+    record = load_fixture("v6_generation_success")
+    assert record.schema_version == 6
+    assert record.task_type == "video_generation"
+    assert record.source_video is None
+    assert record.task_parameters["duration_seconds"] == 5
+    assert record.task_parameters["subject_motion"][0] == "character sits on the rooftop ledge"
+
+
+def test_v6_editing_failed_loads():
+    record = load_fixture("v6_editing_failed")
+    assert record.task_type == "video_editing" and record.status == "failed"
+
+
+def test_current_record_without_task_type_rejected():
+    data = json.loads((FIXTURES / "v6_generation_success.json").read_text(encoding="utf-8"))
+    data["task_type"] = None
+    with pytest.raises(ValueError, match="task_type"):
+        BenchmarkResult.from_dict(data)
+
+
+def test_unknown_task_type_rejected():
+    data = json.loads((FIXTURES / "v6_generation_success.json").read_text(encoding="utf-8"))
+    data["task_type"] = "video_repair"  # not implemented yet
+    with pytest.raises(ValueError, match="task_type"):
+        BenchmarkResult.from_dict(data)
+
+
 def test_current_records_roundtrip(tmp_path):
-    record = load_fixture("v5_failed")
+    record = load_fixture("v6_generation_success")
     logger = BenchmarkLogger(tmp_path)
     logger.log(record)
     assert logger.load(record.benchmark_id, record.run_id) == record

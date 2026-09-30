@@ -49,10 +49,15 @@ outputs/*
 
 # Benchmark inputs/references are often large media: keep them out of git,
 # but keep the folders. Benchmark result JSON files ARE committed.
-benchmarks/inputs/*
-!benchmarks/inputs/.gitkeep
-benchmarks/references/*
-!benchmarks/references/.gitkeep
+# Folder structure and folder READMEs (asset specs) are tracked; media is not.
+benchmarks/inputs/**
+!benchmarks/inputs/**/
+!benchmarks/inputs/**/.gitkeep
+!benchmarks/inputs/**/README.md
+benchmarks/references/**
+!benchmarks/references/**/
+!benchmarks/references/**/.gitkeep
+!benchmarks/references/**/README.md
 
 # --- Temporary files ---
 tmp/

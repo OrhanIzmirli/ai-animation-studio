@@ -28,6 +28,14 @@ Schema history:
        apply to them; they are never rewritten (results are immutable).
        human_rating is DEPRECATED (kept so v1-v4 files still load): new
        ratings go through HumanEvaluationStore, and the runner never sets it.
+  6  + task_type ("video_generation" | "video_editing"), required from v6;
+       + task_parameters: task-level request fields with no generic column
+       (generation: duration_seconds, requested_fps, camera_motion,
+       subject_motion, visual_direction). Why: generation runs have no
+       source video and carry shot controls that must be recorded to be
+       reproducible. Migration: none. v1-v5 files load with task_type=None
+       (unknown: v1-v2 were logged by hand; v3-v5 runner records were all
+       editing) and task_parameters={}.
 """
 
 from __future__ import annotations
@@ -36,9 +44,12 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-SCHEMA_VERSION = 5
+from ai_studio.media import Resolution  # re-exported: Phase 0-1A import path
+
+SCHEMA_VERSION = 6
 
 STATUSES = ("success", "failed")
+TASK_TYPES = ("video_generation", "video_editing")  # = Capability values
 FAILURE_STAGES = ("validation", "prepare", "generation", "verification", "logging")
 
 _UNSAFE_FILE_NAME_CHARS = '/\\:*?"<>|'
@@ -55,23 +66,15 @@ def check_file_name_safe(name: str, value: str) -> None:
         raise ValueError(f"{name} must be usable as a file name: {value!r}")
 
 
-@dataclass(frozen=True)
-class Resolution:
-    width: int
-    height: int
-
-    def __post_init__(self) -> None:
-        for name in ("width", "height"):
-            value = getattr(self, name)
-            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
-                raise ValueError(f"resolution {name} must be a positive int")
-
-
 @dataclass(frozen=True, kw_only=True)
 class BenchmarkResult:
     # Identity
     benchmark_id: str
     run_id: str
+
+    # Task (None only in pre-v6 records)
+    task_type: str | None = None
+    task_parameters: dict[str, Any] = field(default_factory=dict)
 
     # Outcome
     status: str = "success"
@@ -143,6 +146,10 @@ class BenchmarkResult:
             raise ValueError("frame_count must be positive")
         for name in ("benchmark_id", "run_id"):
             check_file_name_safe(name, getattr(self, name))
+        if self.task_type is not None and self.task_type not in TASK_TYPES:
+            raise ValueError(f"task_type must be one of {TASK_TYPES}")
+        if self.schema_version >= 6 and self.task_type is None:
+            raise ValueError("task_type is required")
         if self.status not in STATUSES:
             raise ValueError(f"status must be one of {STATUSES}")
         if self.status == "failed":
@@ -166,7 +173,7 @@ class BenchmarkResult:
             value = getattr(self, name)
             if value is not None and value < 0:
                 raise ValueError(f"{name} must be >= 0")
-        for name in ("model_parameters", "environment", "input_checksums"):
+        for name in ("model_parameters", "environment", "input_checksums", "task_parameters"):
             if not isinstance(getattr(self, name), dict):
                 raise ValueError(f"{name} must be a dict")
 

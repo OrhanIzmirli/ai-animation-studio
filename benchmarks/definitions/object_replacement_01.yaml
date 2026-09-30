@@ -12,6 +12,9 @@
 # benchmarks/inputs/, reference images in benchmarks/references/.
 
 benchmark_id: object_replacement_01
+task_type: video_editing
+status: draft                 # change to ready only by explicit human decision,
+                              # once the real source video and references exist
 
 source_video: null        # e.g. benchmarks/inputs/<clip>.mp4
 reference_images: []      # e.g. [benchmarks/references/<object>.png]

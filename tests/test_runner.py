@@ -322,7 +322,8 @@ def test_failure_during_race_does_not_overwrite(runner, request_factory):
     class RacingBackend(FakeBackend):
         def generate(self, request, output_dir):
             other = BenchmarkResult(
-                benchmark_id=BENCH, run_id="run-1", model="other", model_version="1",
+                benchmark_id=BENCH, run_id="run-1", task_type="video_editing",
+                model="other", model_version="1",
                 workflow_version="w", seed=0, inference_steps=None, guidance=None,
                 prompt="p", resolution=request.output_resolution,
                 output_video="outputs/other.mp4",
