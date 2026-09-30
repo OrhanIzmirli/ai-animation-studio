@@ -58,10 +58,10 @@ def test_unknown_status_rejected(tmp_path, bad):
         load_definition(write(tmp_path, GENERATION + f"status: {bad}\n"))
 
 
-def test_repository_benchmarks_are_drafts():
+def test_repository_benchmark_statuses():
     definitions = load_definitions(REPO_DEFINITIONS)
-    assert definitions["comic_rooftop_01"].status == "draft"
-    assert definitions["object_replacement_01"].status == "draft"
+    assert definitions["comic_rooftop_01"].status == "ready"  # marked ready 2026-09-30
+    assert definitions["object_replacement_01"].status == "draft"  # real assets pending
 
 
 # --- draft cannot run ---
@@ -100,10 +100,9 @@ def test_runner_refuses_draft_editing(project_runner, input_files):
 
 
 def test_repository_drafts_cannot_run(project_runner):
-    for name in ("comic_rooftop_01", "object_replacement_01"):
-        definition = load_definition(REPO_DEFINITIONS / f"{name}.yaml")
-        with pytest.raises(DraftBenchmarkError):
-            project_runner.run_definition(definition, FakeGenerationBackend(), seed=1, output_resolution=RES)
+    definition = load_definition(REPO_DEFINITIONS / "object_replacement_01.yaml")
+    with pytest.raises(DraftBenchmarkError):
+        project_runner.run_definition(definition, FakeBackend(), seed=1, output_resolution=RES)
 
 
 def test_existing_files_do_not_make_a_benchmark_ready(project, input_files):

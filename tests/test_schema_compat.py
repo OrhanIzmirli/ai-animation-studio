@@ -18,6 +18,7 @@ FIXTURES = Path(__file__).parent / "fixtures" / "schema"
 ALL_FIXTURES = [
     "v1", "v2", "v3", "v4_success", "v4_failed", "v5_success", "v5_failed",
     "v6_generation_success", "v6_editing_failed",
+    "v7_image_to_video_success",
 ]
 
 
@@ -26,8 +27,8 @@ def load_fixture(name):
 
 
 def test_current_schema_version_has_a_fixture():
-    assert SCHEMA_VERSION == 6
-    assert (FIXTURES / "v6_generation_success.json").is_file()
+    assert SCHEMA_VERSION == 7
+    assert (FIXTURES / "v7_image_to_video_success.json").is_file()
 
 
 def test_v1_loads():
@@ -152,8 +153,22 @@ def test_unknown_task_type_rejected():
         BenchmarkResult.from_dict(data)
 
 
+@pytest.mark.parametrize("name", ALL_FIXTURES[:9])
+def test_pre_v7_records_have_no_start_frame(name):
+    assert load_fixture(name).start_frame is None
+
+
+def test_v7_image_to_video_loads():
+    record = load_fixture("v7_image_to_video_success")
+    assert record.schema_version == 7
+    assert record.start_frame["path"] == "benchmarks/references/comic_hero_01/rooftop_frame_v001.png"
+    assert record.start_frame["original_width"] == 1672
+    assert record.start_frame["effective_width"] == 1280
+    assert record.start_frame["path"] not in record.reference_assets
+
+
 def test_current_records_roundtrip(tmp_path):
-    record = load_fixture("v6_generation_success")
+    record = load_fixture("v7_image_to_video_success")
     logger = BenchmarkLogger(tmp_path)
     logger.log(record)
     assert logger.load(record.benchmark_id, record.run_id) == record

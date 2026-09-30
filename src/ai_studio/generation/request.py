@@ -4,6 +4,14 @@ No source video. Unlike BenchmarkRequest, this carries no benchmark metadata
 (the runner receives the benchmark_id separately), so the same request type
 can later be used by the production pipeline.
 
+start_frame vs reference_images - NOT interchangeable:
+  start_frame       the exact image that must condition frame 0
+                    (image-to-video). Only backends declaring
+                    supports_start_frame may run such a request, and they must
+                    report how they used it (StartFrameConditioning).
+  reference_images  additional identity / style / subject references.
+The same file may not appear in both.
+
 Shot controls (camera_motion, subject_motion, visual_direction) are generic
 free-form descriptions: a string, a list of strings, or a JSON-like mapping.
 Backends decide how to use them (fold into the prompt, map to their own
@@ -57,6 +65,7 @@ class VideoGenerationRequest:
     seed: int
     fps: float | None = None  # None: backend default (the backend reports what it used)
     negative_prompt: str | None = None
+    start_frame: str | None = None  # conditions frame 0; see module docstring
     reference_images: list[str] = field(default_factory=list)
     camera_motion: ShotControl = None
     subject_motion: ShotControl = None
@@ -86,6 +95,14 @@ class VideoGenerationRequest:
             isinstance(p, str) and p for p in self.reference_images
         ):
             raise ValueError("reference_images must be a list of non-empty paths")
+        if self.start_frame is not None:
+            if not isinstance(self.start_frame, str) or not self.start_frame:
+                raise ValueError("start_frame must be a non-empty path or None")
+            if self.start_frame in self.reference_images:
+                raise ValueError(
+                    "start_frame must not also be listed in reference_images: "
+                    "they are not interchangeable"
+                )
         for name in ("camera_motion", "subject_motion", "visual_direction"):
             check_shot_control(name, getattr(self, name))
         if not isinstance(self.backend_parameters, dict):
@@ -96,10 +113,14 @@ class VideoGenerationRequest:
 
     @property
     def input_paths(self) -> list[str]:
-        return list(self.reference_images)
+        return ([self.start_frame] if self.start_frame else []) + list(self.reference_images)
 
     def with_resolved_paths(self, resolve: Callable[[str], str]) -> VideoGenerationRequest:
-        return dataclasses.replace(self, reference_images=[resolve(p) for p in self.reference_images])
+        return dataclasses.replace(
+            self,
+            start_frame=resolve(self.start_frame) if self.start_frame else None,
+            reference_images=[resolve(p) for p in self.reference_images],
+        )
 
     def task_parameters(self) -> dict[str, Any]:
         """Task-level request fields not covered by the generic record columns."""

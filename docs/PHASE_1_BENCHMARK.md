@@ -24,6 +24,27 @@ neither is assumed from the other. The editing candidates (JoyAI-Video-Edit,
 Kiwi-Edit, Wan 2.2 VACE-Fun + EditCtrl) are declared editing-only until
 verified. Generation candidates are still to be researched.
 
+### Image-to-video: `start_frame` vs `reference_images`
+
+- **`start_frame`** is the exact image that must condition **frame 0**.
+- **`reference_images`** are additional identity, style or subject references.
+
+The two are **not interchangeable**, and the same file may not appear in
+both. A request with a `start_frame` only runs on a backend that declares
+`supports_start_frame`. That backend must return `StartFrameConditioning`,
+listing every preprocessing step and the effective dimensions passed to the
+model, plus the path of any derived copy, which lives in the run's output
+directory.
+
+A backend that silently treats the start frame as a plain reference fails
+verification. The run record's `start_frame` block keeps the path, SHA-256,
+original and effective dimensions, preprocessing and derived file. The
+canonical image itself is never modified; the input checksum check enforces
+this.
+
+Generation definitions may pin `fps`. A run-time `fps` that differs from the
+pinned value is rejected.
+
 Generation definitions carry structured shot controls: `duration_seconds`,
 `camera_motion`, `subject_motion`, `visual_direction`. Each control is a
 generic string, list or mapping, never a model-specific field. They are
@@ -242,6 +263,7 @@ added later with their defaults.
 | 4 | + `status`, `failure_stage`, `error_type`, `error_message`; per-stage timings | `status: success` (v1–v3 only recorded successes), timings `null` |
 | 5 | + `output_video`; `human_rating` deprecated | `output_video: null` |
 | 6 | + `task_type` (required), `task_parameters` | `task_type: null` (unknown), `task_parameters: {}` |
+| 7 | + `start_frame` (image-to-video reproducibility block) | `start_frame: null` |
 
 v5 migration: no action is needed. From v5 on, a successful record **must**
 have `output_video`; the rule is checked only for records with

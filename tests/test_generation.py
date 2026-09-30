@@ -82,7 +82,7 @@ def test_generation_request_has_no_model_specific_fields():
 
     names = {f.name for f in fields(VideoGenerationRequest)}
     assert names == {
-        "prompt", "negative_prompt", "reference_images", "duration_seconds", "fps",
+        "prompt", "negative_prompt", "start_frame", "reference_images", "duration_seconds", "fps",
         "output_resolution", "seed", "backend_parameters",
         "camera_motion", "subject_motion", "visual_direction",
     }
@@ -188,8 +188,9 @@ def test_generation_run_records_everything(runner, generation_request_factory, i
     )
 
     data = json.loads(runner.logger.path_for(BENCH, "run-1").read_text(encoding="utf-8"))
-    assert data["schema_version"] == 6
+    assert data["schema_version"] == 7
     assert data["task_type"] == "video_generation"
+    assert data["start_frame"] is None  # text/reference-to-video, no start frame
     assert data["status"] == "success"
     assert data["source_video"] is None
     assert data["output_video"] == f"outputs/{BENCH}/run-1/gen.mp4"

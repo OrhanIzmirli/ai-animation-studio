@@ -53,6 +53,7 @@ from ai_studio.generation.backends.base import (
 from ai_studio.generation.capabilities import UnsupportedCapabilityError
 from ai_studio.generation.request import VideoGenerationRequest
 from ai_studio.generation.result import GenerationResult
+from ai_studio.media import image_dimensions
 from ai_studio.paths import project_root, resolve_path, to_project_relative
 
 MAX_ERROR_MESSAGE_CHARS = 4000
@@ -166,6 +167,11 @@ class BenchmarkRunner:
                 f"{sorted(c.value for c in backend.capabilities)}, "
                 f"not {request.capability.value!r}"
             )
+        if getattr(request, "start_frame", None) and not getattr(backend, "supports_start_frame", False):
+            raise UnsupportedCapabilityError(
+                f"{type(backend).__name__} does not declare start-frame conditioning "
+                "(supports_start_frame); a start_frame is never downgraded to a reference image"
+            )
         run_id = run_id or new_run_id()
         check_file_name_safe("run_id", run_id)
         output_dir = self.outputs_dir / benchmark_id / run_id
@@ -260,6 +266,19 @@ class BenchmarkRunner:
             raise RuntimeError(f"backend output must be a file inside {output_dir}: {output}")
         if {p: sha256_file(p) for p in request.input_paths} != checksums:
             raise RuntimeError("backend modified an input file; original inputs must be preserved")
+        conditioning = result.start_frame_conditioning
+        if getattr(request, "start_frame", None):
+            if conditioning is None:
+                raise RuntimeError(
+                    "request has a start_frame but the backend did not report start-frame "
+                    "conditioning; refusing a silent downgrade to a reference image"
+                )
+            if conditioning.derived_file is not None:
+                derived = resolve_path(conditioning.derived_file, root)
+                if not derived.is_relative_to(output_dir.resolve()) or not derived.is_file():
+                    raise RuntimeError(f"derived start frame must be a file inside {output_dir}: {derived}")
+        elif conditioning is not None:
+            raise RuntimeError("backend reported start-frame conditioning for a request without start_frame")
 
     def _collect_environment(self) -> dict[str, Any]:
         try:
@@ -315,6 +334,7 @@ class BenchmarkRunner:
             ),
             reference_assets=[to_project_relative(p, self.root) for p in request.reference_images],
             input_checksums={to_project_relative(p, self.root): h for p, h in run.checksums.items()},
+            start_frame=self._start_frame_record(run, valid_result),
             resolution=request.output_resolution,
             fps=valid_result.fps if valid_result else None,
             frame_count=valid_result.frame_count if valid_result else None,
@@ -329,6 +349,31 @@ class BenchmarkRunner:
             environment=environment,
             notes="\n".join(line for line in note_lines if line),
         )
+
+    def _start_frame_record(self, run: _Run, result: GenerationResult | None) -> dict[str, Any] | None:
+        start_frame = getattr(run.request, "start_frame", None)
+        if not start_frame:
+            return None
+        absolute = resolve_path(start_frame, self.root)
+        try:
+            original = image_dimensions(absolute)
+        except OSError:
+            original = None
+        conditioning = result.start_frame_conditioning if result else None
+        return {
+            "path": to_project_relative(absolute, self.root),
+            # Checksum taken before generation; None if validation failed first.
+            "sha256": run.checksums.get(str(absolute)),
+            "original_width": original.width if original else None,
+            "original_height": original.height if original else None,
+            "preprocessing": list(conditioning.preprocessing) if conditioning else None,
+            "effective_width": conditioning.effective_width if conditioning else None,
+            "effective_height": conditioning.effective_height if conditioning else None,
+            "derived_file": (
+                to_project_relative(conditioning.derived_file, self.root)
+                if conditioning and conditioning.derived_file else None
+            ),
+        }
 
     def _save_failure(self, run: _Run, exc: Exception, stage: str) -> BenchmarkResult | None:
         """Write a status="failed" record. Returns None if that is not possible."""

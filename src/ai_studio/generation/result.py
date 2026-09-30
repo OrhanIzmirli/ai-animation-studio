@@ -8,6 +8,31 @@ from typing import Any
 
 
 @dataclass(frozen=True, kw_only=True)
+class StartFrameConditioning:
+    """How a backend actually conditioned frame 0 on the request's start_frame.
+    Required in the result whenever the request has a start_frame."""
+
+    # Every transformation applied before the model saw the image, in order,
+    # e.g. ["resize 1672x941 -> 1280x720 (lanczos)", "center-crop"]; [] if none.
+    preprocessing: list[str]
+    effective_width: int  # dimensions actually passed to the model
+    effective_height: int
+    derived_file: str | None = None  # preprocessed copy, if one was written (inside output_dir)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.preprocessing, list) or not all(
+            isinstance(step, str) and step.strip() for step in self.preprocessing
+        ):
+            raise ValueError("preprocessing must be a list of non-empty strings")
+        for name in ("effective_width", "effective_height"):
+            value = getattr(self, name)
+            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                raise ValueError(f"{name} must be a positive int")
+        if self.derived_file is not None and (not isinstance(self.derived_file, str) or not self.derived_file):
+            raise ValueError("derived_file must be a non-empty path or None")
+
+
+@dataclass(frozen=True, kw_only=True)
 class GenerationResult:
     output_video: str
     backend_name: str
@@ -28,6 +53,9 @@ class GenerationResult:
     frame_count: int | None = None
     inference_steps: int | None = None
     guidance: float | None = None
+
+    # Set if and only if the request had a start_frame.
+    start_frame_conditioning: StartFrameConditioning | None = None
 
     def __post_init__(self) -> None:
         for name in ("output_video", "backend_name", "backend_version", "model_name", "model_version"):
@@ -50,3 +78,7 @@ class GenerationResult:
             raise ValueError("fps must be positive")
         if self.frame_count is not None and self.frame_count <= 0:
             raise ValueError("frame_count must be positive")
+        if self.start_frame_conditioning is not None and not isinstance(
+            self.start_frame_conditioning, StartFrameConditioning
+        ):
+            raise ValueError("start_frame_conditioning must be a StartFrameConditioning")

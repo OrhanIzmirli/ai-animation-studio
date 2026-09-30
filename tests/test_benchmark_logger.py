@@ -43,14 +43,14 @@ def test_log_writes_json_with_all_fields(tmp_path):
         "status", "failure_stage", "error_type", "error_message",
         "validation_time_seconds", "prepare_time_seconds",
         "verification_time_seconds", "total_time_seconds", "output_video",
-        "task_type", "task_parameters",
+        "task_type", "task_parameters", "start_frame",
     }
     assert set(data) == expected_keys
     assert data["resolution"] == {"width": 1280, "height": 720}
     assert data["quality_metrics"] == {"sharpness": 0.8}
     assert data["model_parameters"] == {}
     assert data["environment"] == {}
-    assert data["schema_version"] == 6
+    assert data["schema_version"] == 7
 
 
 def test_model_parameters_and_environment_roundtrip(tmp_path):

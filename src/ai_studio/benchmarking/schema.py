@@ -36,6 +36,12 @@ Schema history:
        reproducible. Migration: none. v1-v5 files load with task_type=None
        (unknown: v1-v2 were logged by hand; v3-v5 runner records were all
        editing) and task_parameters={}.
+  7  + start_frame: reproducibility block for image-to-video runs
+       {path, sha256, original_width, original_height, preprocessing,
+        effective_width, effective_height, derived_file}; None when the run
+       had no start frame. Why: frame 0 conditioning must be pinned to an
+       exact file and the backend's preprocessing must be visible for a fair
+       image-to-video comparison. Migration: none; v1-v6 load with None.
 """
 
 from __future__ import annotations
@@ -46,10 +52,14 @@ from typing import Any
 
 from ai_studio.media import Resolution  # re-exported: Phase 0-1A import path
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 STATUSES = ("success", "failed")
 TASK_TYPES = ("video_generation", "video_editing")  # = Capability values
+START_FRAME_KEYS = (
+    "path", "sha256", "original_width", "original_height",
+    "preprocessing", "effective_width", "effective_height", "derived_file",
+)
 FAILURE_STAGES = ("validation", "prepare", "generation", "verification", "logging")
 
 _UNSAFE_FILE_NAME_CHARS = '/\\:*?"<>|'
@@ -102,6 +112,8 @@ class BenchmarkResult:
     reference_assets: list[str] = field(default_factory=list)
     # path -> sha256; proves runs being compared used identical input files
     input_checksums: dict[str, str] = field(default_factory=dict)
+    # Image-to-video only; see START_FRAME_KEYS. Not listed in reference_assets.
+    start_frame: dict[str, Any] | None = None
 
     # Output. Project-relative POSIX path when inside the project root.
     output_video: str | None = None
@@ -173,6 +185,15 @@ class BenchmarkResult:
             value = getattr(self, name)
             if value is not None and value < 0:
                 raise ValueError(f"{name} must be >= 0")
+        if self.start_frame is not None:
+            if not isinstance(self.start_frame, dict) or set(self.start_frame) != set(START_FRAME_KEYS):
+                raise ValueError(f"start_frame must be a dict with keys {START_FRAME_KEYS}")
+            if not self.start_frame["path"]:
+                raise ValueError("start_frame needs a path")
+            if self.status == "success" and (
+                not self.start_frame["sha256"] or self.start_frame["effective_width"] is None
+            ):
+                raise ValueError("successful start-frame run must record sha256 and effective dimensions")
         for name in ("model_parameters", "environment", "input_checksums", "task_parameters"):
             if not isinstance(getattr(self, name), dict):
                 raise ValueError(f"{name} must be a dict")

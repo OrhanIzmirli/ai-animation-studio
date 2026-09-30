@@ -5,7 +5,7 @@
 # Tests whether a video pipeline can keep ONE character and a graphic-novel /
 # hybrid 2D-3D look stable across a ~5 second shot.
 #
-# PLACEHOLDER INPUTS: the character reference images do not exist yet.
+# Image-to-video: rooftop_frame_v001.png is the canonical start frame (frame 0).
 # Once runs exist, this definition must not change; create
 # comic_rooftop_02.yaml instead.
 #
@@ -14,30 +14,32 @@
 
 benchmark_id: comic_rooftop_01
 task_type: video_generation   # new video from text + references; no source video
-status: draft                 # change to ready only by explicit human decision,
-                              # once the COMIC_HERO_01 reference sheet is final
+status: ready                 # marked ready by explicit human decision (2026-09-30),
+                              # after rooftop_frame_v001.png was supplied
 
-# COMIC_HERO_01 character sheet. Files to be created; see
-# benchmarks/references/comic_hero_01/README.md. Not listed yet because the
-# runner requires every listed reference file to exist.
+# Exact image that conditions frame 0. Original file, never modified.
+#   1672x941 PNG, RGB 8-bit, 2497820 bytes
+#   sha256 3a3e76750196317ee5142d7d6d00d2c68af58a993ee54ca8cc9fa665dbf1e0fb
+# Requires a backend with supports_start_frame. The runner checksums it on
+# every run and records it in record.start_frame.
+start_frame: benchmarks/references/comic_hero_01/rooftop_frame_v001.png
+
+# Additional identity/style references (not the start frame). None yet.
 reference_images: []
-#  - benchmarks/references/comic_hero_01/front.png
-#  - benchmarks/references/comic_hero_01/three_quarter.png
-#  - benchmarks/references/comic_hero_01/profile.png
-#  - benchmarks/references/comic_hero_01/style_frame.png
 
 prompt: >-
-  Graphic novel style animated shot, hybrid 2D and 3D animation. A young man
-  with short messy black hair, wearing a dark charcoal hooded jacket over a
-  plain light-grey t-shirt, dark cargo trousers and worn white sneakers, sits
-  on the edge of a high rooftop ledge overlooking a dense city at late sunset,
-  city lights beginning to glow. Subtle wind moves his hair and jacket. He
-  stays mostly still, looking out over the city; near the end he slowly turns
-  his head slightly toward the camera. Slow cinematic camera push-in from a
-  low three-quarter angle behind him. Strong ink contours, controlled cel
-  shading, halftone print texture, hand-drawn hatching in the shadows, layered
-  city background with depth, cinematic perspective, limited stepped animation
-  timing. Consistent face, consistent clothing design, stable architecture.
+  Graphic novel style animated shot, hybrid 2D and 3D animation. Seen from
+  behind at a low three-quarter angle, a young man with curly dark hair,
+  wearing dark hooded streetwear with subtle dark-red accents, dark trousers
+  and light sneakers, and carrying a dark backpack with subtle red detailing,
+  sits on the edge of a high rooftop ledge overlooking a dense city at late
+  sunset, city lights beginning to glow. Subtle wind moves his hair and
+  clothing. He stays mostly still, looking out over the city; near the end he
+  slowly turns his head slightly toward the camera. Slow cinematic camera
+  push-in. Strong ink contours, controlled cel shading, halftone print texture,
+  hand-drawn hatching in the shadows, layered city background with depth,
+  cinematic perspective, limited stepped animation timing. Consistent
+  character, consistent clothing design, stable architecture.
 
 negative_prompt: >-
   photorealistic, live action, 3D render look, glossy plastic shading, soft
@@ -49,6 +51,7 @@ negative_prompt: >-
 # --- structured shot controls (generic; backends map them as they can) ---
 
 duration_seconds: 5
+fps: 24
 
 camera_motion: slow cinematic push-in from a low three-quarter angle behind the character
 
@@ -72,6 +75,7 @@ visual_direction:
   - stable background geometry
 
 notes: |
+  start_frame_sha256: 3a3e76750196317ee5142d7d6d00d2c68af58a993ee54ca8cc9fa665dbf1e0fb
   character: COMIC_HERO_01
   difficulty_level: 1 (stationary character + slow camera)
   time_of_day: late sunset, city lights starting to glow

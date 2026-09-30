@@ -40,7 +40,9 @@ class DraftBenchmarkError(RuntimeError):
 
 
 EDITING_ONLY_FIELDS = ("source_video", "target_object", "preserve_regions")
-GENERATION_ONLY_FIELDS = ("duration_seconds", "camera_motion", "subject_motion", "visual_direction")
+GENERATION_ONLY_FIELDS = (
+    "duration_seconds", "fps", "start_frame", "camera_motion", "subject_motion", "visual_direction",
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -60,6 +62,8 @@ class BenchmarkDefinition:
 
     # video_generation only (shot controls: string, list of strings or mapping)
     duration_seconds: float | None = None
+    fps: float | None = None
+    start_frame: str | None = None  # conditions frame 0; never also a reference image
     camera_motion: ShotControl = None
     subject_motion: ShotControl = None
     visual_direction: ShotControl = None
@@ -86,6 +90,15 @@ class BenchmarkDefinition:
             or self.duration_seconds <= 0
         ):
             raise ValueError("duration_seconds must be a positive number")
+        if self.fps is not None and (
+            not isinstance(self.fps, (int, float)) or isinstance(self.fps, bool) or self.fps <= 0
+        ):
+            raise ValueError("fps must be a positive number")
+        if self.start_frame is not None:
+            if not isinstance(self.start_frame, str) or not self.start_frame:
+                raise ValueError("start_frame must be a non-empty path")
+            if self.start_frame in self.reference_images:
+                raise ValueError("start_frame must not also be listed in reference_images")
         for name in ("camera_motion", "subject_motion", "visual_direction"):
             check_shot_control(name, getattr(self, name))
 
@@ -127,12 +140,17 @@ class BenchmarkDefinition:
                 seed=seed,
                 backend_parameters=dict(backend_parameters or {}),
             )
+        if fps is not None and self.fps is not None and fps != self.fps:
+            raise ValueError(
+                f"fps {fps} conflicts with the benchmark's pinned fps {self.fps}"
+            )
         return VideoGenerationRequest(
             prompt=self.prompt,
             negative_prompt=self.negative_prompt,
+            start_frame=self.start_frame,
             reference_images=list(self.reference_images),
             duration_seconds=self.duration_seconds,
-            fps=fps,
+            fps=self.fps if self.fps is not None else fps,
             output_resolution=output_resolution,
             seed=seed,
             camera_motion=self.camera_motion,

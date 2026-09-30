@@ -100,9 +100,16 @@ class VideoBackend(ABC):
 
 
 class VideoGenerationBackend(VideoBackend):
-    """Text / image / references -> new video. No source video."""
+    """Text / image / references -> new video. No source video.
+
+    Image-to-video: a request with start_frame may only run on a backend that
+    sets supports_start_frame = True. Such a backend must condition frame 0 on
+    that exact image and return StartFrameConditioning in its result; it must
+    never quietly treat start_frame as just another reference image.
+    """
 
     _contract_capability = Capability.VIDEO_GENERATION
+    supports_start_frame: ClassVar[bool] = False
 
     @abstractmethod
     def generate(self, request: VideoGenerationRequest, output_dir: Path) -> GenerationResult:

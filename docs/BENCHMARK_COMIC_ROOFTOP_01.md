@@ -30,14 +30,18 @@ matching Level 1) and **late sunset** (one lighting condition, not two).
 
 ## Character: COMIC_HERO_01
 
-Original design, not based on any existing character, title or costume:
-young man, short messy black hair, dark charcoal hooded jacket (hood down),
-plain light-grey t-shirt, dark cargo trousers, worn white sneakers. No mask,
-logo, emblem or text.
+Original design, not based on any existing character, title or costume.
+The canonical frame defines it. Only features visible there count: young man
+with curly dark hair, dark hooded streetwear with subtle dark-red accents,
+dark trousers, light sneakers, dark backpack with subtle red detailing. No
+mask, logo, emblem or text.
 
-Reference sheet (planned, not created yet):
-`benchmarks/references/comic_hero_01/` — front, three-quarter, profile, face
-close-up, style frame. See that folder's README.
+**Canonical start frame:** `benchmarks/references/comic_hero_01/rooftop_frame_v001.png`
+(1672×941 PNG, SHA-256 `3a3e7675…dbf1e0fb`). It is the benchmark's
+`start_frame`, the exact image conditioning frame 0 (image-to-video), and
+is not listed in `reference_images`. The benchmark pins `duration_seconds: 5`
+and `fps: 24`. Only backends that declare start-frame conditioning can run it.
+Further sheets (front, profile, ...) are planned. See that folder's README.
 
 ## Visual direction
 
