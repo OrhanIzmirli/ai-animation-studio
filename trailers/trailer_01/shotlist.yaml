@@ -1,0 +1,233 @@
+# Trailer 01 - shot list. 30 seconds, 7 shots, original story.
+#
+# A young man watches his city from a rooftop at sunset. A red glow wakes
+# under his hand, the city's lights go out block by block, and he stands up
+# to meet whatever is coming.
+#
+# Original material only: no existing characters, titles, logos, costumes or
+# signature motifs of any franchise. The hero wears ordinary hooded
+# streetwear; his face is never covered.
+#
+# This file is planning data. Nothing here generates video. Every shot is a
+# DRAFT until a human sets "status: ready".
+#   scripts/assemble_trailer.py --trailer trailer_01
+# cuts the trailer from one chosen clip per shot ("clip:"); a shot without a
+# clip becomes a labelled grey card. Format: src/ai_studio/trailer/shotlist.py
+#
+# Paths are relative to the project root.
+
+trailer_id: trailer_01
+working_title: WHEN THE GRID SLEEPS    # placeholder title, a human decision
+status: draft
+fps: 24
+resolution: {width: 1280, height: 704}
+total_duration_seconds: 30
+
+# One artist profile for every shot (configs/style_recipes/<name>.yaml).
+artist_profile: comic_finish_v1
+
+character: COMIC_HERO_01
+# The look every generated shot shares (appended to the prompts below by hand,
+# so each prompt is complete on its own).
+#   Graphic novel style, hybrid 2D and 3D animation, strong ink contours,
+#   controlled cel shading, halftone print texture, hand-drawn hatching in the
+#   shadows, limited stepped animation timing.
+
+shots:
+  - id: shot_01
+    name: The city at sunset
+    source: generated
+    duration_seconds: 4
+    needs_character_keyframe: false
+    status: draft
+    camera: wide establishing shot from high above the rooftops, slow cinematic push-in
+    motion:
+      - the city is calm; a few windows and street lights begin to glow
+      - thin clouds drift slowly across the sunset sky
+    prompt: >-
+      Graphic novel style animated shot, hybrid 2D and 3D animation. Wide
+      establishing view over a dense city at late sunset, seen from high above
+      the rooftops: layered towers and water tanks, long orange light, deep
+      violet shadows, the first windows and street lights beginning to glow.
+      Thin clouds drift slowly. Slow cinematic push-in toward one distant
+      rooftop. Strong ink contours, controlled cel shading, halftone print
+      texture, hand-drawn hatching in the shadows, layered background with
+      depth, limited stepped animation timing. Stable architecture.
+    negative_prompt: >-
+      photorealistic, live action, 3D render look, glossy plastic shading,
+      soft airbrushed gradients, blurry, motion blur smear, flickering lines,
+      boiling line art, warping buildings, melting architecture, people,
+      crowds, text, logo, watermark, signature, speech bubbles
+    fade_in_seconds: 1.0
+    clip: null
+
+  - id: shot_02
+    name: The rooftop
+    source: generated
+    # The existing benchmark shot. Its prompt is the benchmark's prompt,
+    # unchanged; the clip is one of that benchmark's recorded runs.
+    benchmark: comic_rooftop_01
+    duration_seconds: 5
+    needs_character_keyframe: true    # benchmarks/references/comic_hero_01/rooftop_frame_v001.png
+    status: draft
+    camera: slow cinematic push-in from a low three-quarter angle behind the character
+    motion:
+      - character sits on the rooftop ledge and remains mostly stationary
+      - subtle wind moves hair and clothing
+      - near the end, a slight head turn toward the camera
+    prompt: >-
+      Graphic novel style animated shot, hybrid 2D and 3D animation. Seen from
+      behind at a low three-quarter angle, a young man with curly dark hair,
+      wearing dark hooded streetwear with subtle dark-red accents, dark trousers
+      and light sneakers, and carrying a dark backpack with subtle red detailing,
+      sits on the edge of a high rooftop ledge overlooking a dense city at late
+      sunset, city lights beginning to glow. Subtle wind moves his hair and
+      clothing. He stays mostly still, looking out over the city; near the end he
+      slowly turns his head slightly toward the camera. Slow cinematic camera
+      push-in. Strong ink contours, controlled cel shading, halftone print texture,
+      hand-drawn hatching in the shadows, layered city background with depth,
+      cinematic perspective, limited stepped animation timing. Consistent
+      character, consistent clothing design, stable architecture.
+    negative_prompt: >-
+      photorealistic, live action, 3D render look, glossy plastic shading, soft
+      airbrushed gradients, blurry, motion blur smear, flickering lines, boiling
+      line art, morphing face, changing hairstyle, changing clothing, extra limbs,
+      deformed hands, warping buildings, melting architecture, text, logo,
+      watermark, signature, speech bubbles, mask, superhero costume
+    clip: null    # choose a run: {run: comic_rooftop_01/<run_id>}
+
+  - id: shot_03
+    name: His eyes
+    source: generated
+    duration_seconds: 4
+    needs_character_keyframe: true
+    status: draft
+    camera: extreme close-up on his eyes, locked off, very slight push-in
+    motion:
+      - city lights shimmer as small reflections in his eyes
+      - one slow blink
+      - a strand of curly hair moves in the wind
+    prompt: >-
+      Graphic novel style animated shot, hybrid 2D and 3D animation. Extreme
+      close-up of the eyes of a young man with curly dark hair, his face
+      uncovered, lit warm from one side by the last sunset light. The lights of
+      the city are reflected as small bright points in his dark eyes. He blinks
+      once, slowly; a strand of hair moves in the wind. Calm, watchful
+      expression. Very slight push-in. Strong ink contours, controlled cel
+      shading, halftone print texture, hand-drawn hatching in the shadows,
+      limited stepped animation timing. Consistent character, stable facial
+      structure.
+    negative_prompt: >-
+      photorealistic, live action, 3D render look, glossy plastic shading,
+      soft airbrushed gradients, blurry, motion blur smear, flickering lines,
+      boiling line art, morphing face, asymmetric eyes, extra eyes, changing
+      hairstyle, glowing eyes, text, logo, watermark, signature, speech
+      bubbles, mask, face covering, goggles, superhero costume
+    clip: null
+
+  - id: shot_04
+    name: The red glow
+    source: generated
+    duration_seconds: 4
+    needs_character_keyframe: true
+    status: draft
+    camera: close-up on his hand on the concrete ledge, low angle, static
+    motion:
+      - his fingers tighten on the edge of the ledge
+      - a soft red glow slowly appears under his palm and spreads along the cracks in the concrete
+      - dust lifts slightly from the ledge
+    prompt: >-
+      Graphic novel style animated shot, hybrid 2D and 3D animation. Close-up
+      of a young man's bare hand gripping the edge of a concrete rooftop
+      ledge, the dark sleeve of a hooded jacket with a subtle dark-red cuff at
+      his wrist, the city far below and out of focus in the dusk. His fingers
+      tighten. A soft red glow slowly appears under his palm and spreads along
+      the fine cracks in the concrete, lighting his fingers from below. Static
+      camera. Strong ink contours, controlled cel shading, halftone print
+      texture, hand-drawn hatching in the shadows, limited stepped animation
+      timing. Consistent clothing design.
+    negative_prompt: >-
+      photorealistic, live action, 3D render look, glossy plastic shading,
+      soft airbrushed gradients, blurry, motion blur smear, flickering lines,
+      boiling line art, extra fingers, missing fingers, deformed hands, fused
+      fingers, glove, gauntlet, claws, fire, flames, lightning, text, logo,
+      emblem, watermark, signature, speech bubbles, superhero costume
+    clip: null
+
+  - id: shot_05
+    name: The lights go out
+    source: generated
+    duration_seconds: 5
+    needs_character_keyframe: false
+    status: draft
+    camera: wide shot of the city at dusk from rooftop height, static with a very slow drift to the right
+    motion:
+      - the city's lights go out block by block, from the horizon toward the camera
+      - the sky stays faintly lit; a full moon is rising
+      - the last lit block, nearest the camera, goes dark at the end
+    prompt: >-
+      Graphic novel style animated shot, hybrid 2D and 3D animation. Wide view
+      of a dense city at dusk from rooftop height, thousands of lit windows
+      and street lights under a deep blue sky with a rising full moon. The
+      lights go out block by block, a wave of darkness moving from the horizon
+      toward the camera, until the nearest block goes dark too and only the
+      moonlight outlines the buildings. Static camera with a very slow drift.
+      Strong ink contours, controlled cel shading, halftone print texture,
+      hand-drawn hatching in the shadows, layered background with depth,
+      limited stepped animation timing. Stable architecture.
+    negative_prompt: >-
+      photorealistic, live action, 3D render look, glossy plastic shading,
+      soft airbrushed gradients, blurry, motion blur smear, flickering lines,
+      boiling line art, random flicker, warping buildings, melting
+      architecture, explosions, fire, people, crowds, text, logo, watermark,
+      signature, speech bubbles
+    clip: null
+
+  - id: shot_06
+    name: He stands
+    source: generated
+    duration_seconds: 5
+    needs_character_keyframe: true
+    status: draft
+    camera: medium shot from behind and slightly below, static, the full moon behind him
+    motion:
+      - he rises from the ledge to his feet
+      - he pulls his hood up over his hair with one hand
+      - he holds still, a dark silhouette against the moon; wind moves his jacket
+    prompt: >-
+      Graphic novel style animated shot, hybrid 2D and 3D animation. Medium
+      shot from behind and slightly below: a young man with curly dark hair in
+      dark hooded streetwear with subtle dark-red accents and a dark backpack
+      rises to his feet on a rooftop ledge above a darkened city. He pulls the
+      hood of his jacket up over his hair with one hand and stands still, a
+      dark silhouette against a large full moon, wind moving his jacket.
+      Static camera. Strong ink contours, controlled cel shading, halftone
+      print texture, hand-drawn hatching in the shadows, limited stepped
+      animation timing. Consistent character, consistent clothing design,
+      stable architecture.
+    negative_prompt: >-
+      photorealistic, live action, 3D render look, glossy plastic shading,
+      soft airbrushed gradients, blurry, motion blur smear, flickering lines,
+      boiling line art, morphing body, changing clothing, extra limbs,
+      deformed hands, cape, armor, weapon, text, logo, emblem, watermark,
+      signature, speech bubbles, mask, face covering, superhero costume
+    fade_out_seconds: 0.5
+    clip: null
+
+  - id: shot_07
+    name: Title card
+    source: title_card    # made in editing, never by a video model
+    duration_seconds: 3
+    needs_character_keyframe: false
+    status: draft
+    camera: none (static card)
+    motion: []
+    prompt: null
+    negative_prompt: null
+    title_card:
+      text: WHEN THE GRID SLEEPS
+      subtitle: null
+      image: null    # optional finished card (PNG at the trailer's resolution); replaces the text
+    fade_in_seconds: 0.5
+    fade_out_seconds: 1.0
+    clip: null
