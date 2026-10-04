@@ -286,8 +286,10 @@ with the computed temporal tile, encoder and recorded provenance.
 
 The base defaults are those of ComfyUI's own template for this model. It is
 also distinct from the diffusers backend `wan-ti2v-5b`, which runs the
-unquantised weights. Measured cost on this laptop: see
-[experiments/E1_REPORT.md](experiments/E1_REPORT.md).
+unquantised weights. **It has not completed a run yet:** the first attempt
+(experiment E1) was stopped from outside while sampling; see
+[experiments/E1_REPORT.md](experiments/E1_REPORT.md). The spike's base run
+(34 min, untiled decode) used the same model through the spike script.
 
 ## Known limits
 
