@@ -73,5 +73,9 @@ def comic_evaluations_dir(root: str | Path | None = None) -> Path:
     return resolve_path("benchmarks/comic_evaluations", root)
 
 
+def metrics_dir(root: str | Path | None = None) -> Path:
+    return resolve_path("benchmarks/metrics", root)
+
+
 def outputs_dir(root: str | Path | None = None) -> Path:
     return resolve_path("outputs", root)

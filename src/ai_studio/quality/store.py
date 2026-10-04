@@ -1,0 +1,182 @@
+"""Measure a benchmark run's video and store the result.
+
+Run records are immutable, so automatic metrics live next to them, like the
+human evaluations do:
+
+    benchmarks/metrics/<benchmark_id>/<run_id>/metrics_v<metrics_version>.json
+
+One file per run and metrics version, created exclusively and never
+overwritten. A new METRICS_VERSION gives a new file beside the old one.
+
+Only successful runs with an output_video can be measured. The record keeps
+the SHA-256 of the measured file, so a later measurement of a different file
+under the same run id is detectable (VideoMetricsStore.video_matches).
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+from ai_studio.benchmarking.logger import BenchmarkLogger
+from ai_studio.benchmarking.schema import BenchmarkResult, check_file_name_safe
+from ai_studio.paths import resolve_path
+from ai_studio.quality.frames import (
+    DEFAULT_ANALYSIS_WIDTH,
+    decode_image,
+    decode_video,
+    ffmpeg_version,
+)
+from ai_studio.quality.metrics import METRICS_VERSION, compute_metrics, transition_diffs
+
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def sha256_file(path: str | Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+@dataclass(frozen=True, kw_only=True)
+class VideoMetricsRecord:
+    benchmark_id: str
+    run_id: str
+    metrics_version: str
+    analysis_size: dict[str, int]  # {"width", "height"} the frames were scaled to
+    video_sha256: str  # of the measured file
+    metrics: dict[str, Any]  # see ai_studio.quality.metrics.compute_metrics
+    per_transition_diffs: list[float]  # mean |diff| of frame i -> i+1, 0-255
+    tool_versions: dict[str, str | None]  # {"numpy", "ffmpeg"}
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    def __post_init__(self) -> None:
+        check_file_name_safe("benchmark_id", self.benchmark_id)
+        check_file_name_safe("run_id", self.run_id)
+        check_file_name_safe("metrics_version", self.metrics_version)
+        if not isinstance(self.video_sha256, str) or not _SHA256_RE.match(self.video_sha256):
+            raise ValueError("video_sha256 must be a lowercase hex SHA-256")
+        if not isinstance(self.analysis_size, dict) or set(self.analysis_size) != {"width", "height"}:
+            raise ValueError("analysis_size must be a dict with width and height")
+        if not all(isinstance(v, int) and not isinstance(v, bool) and v > 0 for v in self.analysis_size.values()):
+            raise ValueError("analysis_size width and height must be positive ints")
+        if not isinstance(self.metrics, dict) or not self.metrics:
+            raise ValueError("metrics must be a non-empty dict")
+        if not isinstance(self.per_transition_diffs, list) or not all(
+            isinstance(v, (int, float)) and not isinstance(v, bool) for v in self.per_transition_diffs
+        ):
+            raise ValueError("per_transition_diffs must be a list of numbers")
+        if not isinstance(self.tool_versions, dict) or set(self.tool_versions) != {"numpy", "ffmpeg"}:
+            raise ValueError("tool_versions must be a dict with numpy and ffmpeg")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> VideoMetricsRecord:
+        return cls(**data)
+
+
+def measure_video(
+    video: str | Path,
+    *,
+    benchmark_id: str,
+    run_id: str,
+    reference_image: str | Path | None = None,
+    analysis_width: int = DEFAULT_ANALYSIS_WIDTH,
+) -> VideoMetricsRecord:
+    """Decode `video` and compute every metric. `reference_image` is the
+    start frame as the model received it (for start_frame_psnr), or None."""
+    video = Path(video)
+    frames = decode_video(video, analysis_width=analysis_width)
+    height, width = frames.shape[1:3]
+    reference = None if reference_image is None else decode_image(reference_image, (width, height))
+    return VideoMetricsRecord(
+        benchmark_id=benchmark_id,
+        run_id=run_id,
+        metrics_version=METRICS_VERSION,
+        analysis_size={"width": int(width), "height": int(height)},
+        video_sha256=sha256_file(video),
+        metrics=compute_metrics(frames, reference),
+        per_transition_diffs=[round(float(v), 4) for v in transition_diffs(frames)],
+        tool_versions={"numpy": np.__version__, "ffmpeg": ffmpeg_version()},
+    )
+
+
+class VideoMetricsStore:
+    """Metrics for benchmark runs. `results` is the run-record logger: metrics
+    are only accepted for runs that exist there, succeeded and have a video."""
+
+    def __init__(self, metrics_dir: str | Path, results: BenchmarkLogger) -> None:
+        self.metrics_dir = resolve_path(metrics_dir)
+        self.results = results
+
+    def path_for(self, benchmark_id: str, run_id: str, metrics_version: str = METRICS_VERSION) -> Path:
+        for name, value in (("benchmark_id", benchmark_id), ("run_id", run_id), ("metrics_version", metrics_version)):
+            check_file_name_safe(name, value)
+        return self.metrics_dir / benchmark_id / run_id / f"metrics_v{metrics_version}.json"
+
+    def exists(self, benchmark_id: str, run_id: str, metrics_version: str = METRICS_VERSION) -> bool:
+        return self.path_for(benchmark_id, run_id, metrics_version).is_file()
+
+    def measurable_run(self, benchmark_id: str, run_id: str) -> BenchmarkResult:
+        """The run record, or ValueError if the run cannot be measured."""
+        run = self.results.load(benchmark_id, run_id)  # FileNotFoundError if there is no such run
+        if run.status != "success":
+            raise ValueError(f"run {run_id} did not succeed; there is nothing to measure")
+        if not run.output_video:
+            raise ValueError(f"run {run_id} has no output_video recorded")
+        return run
+
+    def measure_run(
+        self, benchmark_id: str, run_id: str, root: str | Path | None = None,
+        *, analysis_width: int = DEFAULT_ANALYSIS_WIDTH,
+    ) -> VideoMetricsRecord:
+        """Measure a run's video (paths in the run record are relative to the
+        project root) and save the result. Refuses if this run already has
+        metrics of the current version."""
+        run = self.measurable_run(benchmark_id, run_id)
+        if self.exists(benchmark_id, run_id):
+            raise FileExistsError(f"run {benchmark_id}/{run_id} already has metrics v{METRICS_VERSION}")
+        video = resolve_path(run.output_video, root)
+        if not video.is_file():
+            raise FileNotFoundError(f"video of run {run_id} is not on this machine: {run.output_video}")
+        # The start frame exactly as the model received it, when the run kept one.
+        derived = (run.start_frame or {}).get("derived_file")
+        reference = resolve_path(derived, root) if derived else None
+        if reference is not None and not reference.is_file():
+            reference = None
+        record = measure_video(
+            video, benchmark_id=benchmark_id, run_id=run_id, reference_image=reference,
+            analysis_width=analysis_width,
+        )
+        self.save(record)
+        return record
+
+    def save(self, record: VideoMetricsRecord) -> Path:
+        if not isinstance(record, VideoMetricsRecord):
+            raise TypeError("VideoMetricsStore stores VideoMetricsRecord only")
+        self.measurable_run(record.benchmark_id, record.run_id)
+        path = self.path_for(record.benchmark_id, record.run_id, record.metrics_version)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = json.dumps(record.to_dict(), indent=2, ensure_ascii=False, allow_nan=False)
+        with path.open("x", encoding="utf-8") as f:  # never overwrite
+            f.write(payload + "\n")
+        return path
+
+    def load(self, benchmark_id: str, run_id: str, metrics_version: str = METRICS_VERSION) -> VideoMetricsRecord:
+        path = self.path_for(benchmark_id, run_id, metrics_version)
+        return VideoMetricsRecord.from_dict(json.loads(path.read_text(encoding="utf-8")))
+
+    def video_matches(self, record: VideoMetricsRecord, video: str | Path) -> bool:
+        """True if `video` is byte-identical to the file that was measured."""
+        return sha256_file(video) == record.video_sha256

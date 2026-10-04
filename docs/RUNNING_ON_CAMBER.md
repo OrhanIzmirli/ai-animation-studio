@@ -11,6 +11,11 @@ Wan 2.2 TI2V-5B there, and brings the result back.
 > enables VAE tiling by default. That combination has **not** run on Camber
 > yet, so the decode step, the encoding of real frames and the total time are
 > still unconfirmed. Do the smoke run (step 5) first.
+>
+> **Update:** a smoke run with exactly this setup has since succeeded
+> (`20261004T145422Z-a264ad6e`: 12.4 min in total, of which 7.1 min loading and
+> 5.3 min for 2 steps, the tiled decode and encoding). The full 50-step run
+> has not been done yet, so its ~35 min is still an estimate.
 
 ## GPU budget: read this first
 
@@ -344,7 +349,8 @@ allocator setting is stored in every record.
 
 ## Known limits
 
-- **No successful run yet**; see the status note at the top.
+- **Only a 2-step smoke run has succeeded so far**; see the status note at
+  the top.
 - **`git_dirty` after the first run.** Record files are untracked until you
   commit them on Windows, so once a run has been recorded on Camber, later
   records there show `git_dirty: true` even though the code is unchanged.

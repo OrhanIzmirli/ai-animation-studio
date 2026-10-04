@@ -23,7 +23,8 @@ quality config, tests, documentation. No AI models.
   ([RUNNING_ON_CAMBER.md](RUNNING_ON_CAMBER.md)). The first two runs on the
   L4 loaded the model and denoised, then failed in the VAE decode (out of
   memory, then a diffusers 0.35.2 tiling bug; fixed by pinning 0.36.0).
-  Next: the first successful run; no baseline results exist yet.
+  The first successful run is a 2-step smoke run (20261004T145422Z-a264ad6e);
+  no full-quality baseline exists yet. Next: the first 50-step run.
 
 See [PHASE_1_BENCHMARK.md](PHASE_1_BENCHMARK.md).
 
@@ -38,6 +39,10 @@ preserved unchanged while other parts are edited or repaired.
 ## Phase 3 — Quality Gate
 Modular quality evaluators producing metrics per run. Calibrate thresholds in
 `configs/quality.yaml` from benchmark data and human ratings.
+
+Started early, as measurement only: the first automatic, model-agnostic video
+metrics (`src/ai_studio/quality`, `scripts/measure_run.py`,
+[QUALITY_METRICS.md](QUALITY_METRICS.md)). No thresholds and no gate yet.
 
 ## Phase 4 — Automatic diagnosis and repair
 When the Quality Gate fails: identify what failed and where, repair only the

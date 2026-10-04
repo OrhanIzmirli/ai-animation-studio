@@ -4,6 +4,14 @@ Adapter: [`src/ai_studio/generation/backends/wan_ti2v.py`](../src/ai_studio/gene
 class `WanTI2V5BBackend`. Contract: `VideoGenerationBackend`,
 `supports_start_frame = True`.
 
+> **Update:** the first successful run exists: a 2-step smoke run on the L4
+> with diffusers 0.36.0, `cpu_offload` and `vae_tiling`
+> (`comic_rooftop_01 / 20261004T145422Z-a264ad6e`, 12.4 min in total: 7.1 min
+> loading, 5.3 min generation including the tiled decode and encoding). Tiled
+> decoding and the encoding of real frames therefore work. A full 50-step run
+> and the output quality are still unverified. The paragraph below describes
+> the state before that run.
+>
 > **Status: partly verified on a real GPU; no successful run yet.** Two runs
 > on Camber's NVIDIA L4 (22 GiB usable, diffusers 0.35.2) loaded the weights
 > and completed the denoising steps, then failed: once out of memory in the
@@ -193,8 +201,8 @@ measurement, not from the adapter.
 
 ## Known limits
 
-- **No successful run yet** (see status above). Decoding with tiling on
-  diffusers 0.36.0, decode time and output quality are unverified.
+- **Only a 2-step smoke run has succeeded** (see status above). A full
+  50-step run and the output quality are unverified.
 - `vae_tiling=true` needs diffusers >= 0.36.0; on an older version `prepare()`
   raises `BackendNotInstalledError` (a setup problem: nothing is recorded).
 - Image-to-video only; text-only requests are rejected.
