@@ -1,0 +1,137 @@
+{
+  "benchmark_id": "comic_rooftop_01",
+  "run_id": "20261004T145422Z-a264ad6e",
+  "task_type": "video_generation",
+  "task_parameters": {
+    "duration_seconds": 5,
+    "requested_fps": 24,
+    "duration_tolerance_seconds": 0.1,
+    "camera_motion": "slow cinematic push-in from a low three-quarter angle behind the character",
+    "subject_motion": [
+      "character sits on the rooftop ledge and remains mostly stationary",
+      "subtle wind moves hair and clothing",
+      "near the end, a slight head turn toward the camera"
+    ],
+    "visual_direction": [
+      "graphic novel aesthetic",
+      "hybrid 2D/3D animation",
+      "strong ink contours",
+      "controlled cel shading",
+      "halftone print texture",
+      "hand-drawn hatch details",
+      "layered city background",
+      "cinematic perspective",
+      "intentional limited/stepped animation feel",
+      "stable facial structure",
+      "stable clothing design",
+      "stable background geometry"
+    ]
+  },
+  "status": "success",
+  "failure_stage": null,
+  "error_type": null,
+  "error_message": null,
+  "backend": "wan-ti2v-5b",
+  "backend_version": "upstream-diffusers-0.1",
+  "model": "Wan2.2-TI2V-5B",
+  "model_version": "b8fff7315c768468a5333511427288870b2e9635",
+  "workflow_version": "i2v-v1",
+  "seed": 42,
+  "inference_steps": 2,
+  "guidance": 5.0,
+  "model_parameters": {
+    "cpu_offload": true,
+    "vae_tiling": true,
+    "num_inference_steps": 2,
+    "model_repo": "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
+    "revision": "b8fff7315c768468a5333511427288870b2e9635",
+    "pipeline": "WanImageToVideoPipeline",
+    "guidance_scale": 5.0,
+    "num_frames": 121,
+    "width": 1280,
+    "height": 704,
+    "fps": 24,
+    "torch_dtype": "bfloat16",
+    "vae_dtype": "float32",
+    "encoder": {
+      "codec": "libx264",
+      "pix_fmt": "yuv420p",
+      "crf": 12,
+      "preset": "slow",
+      "fps": 24,
+      "audio": false
+    }
+  },
+  "prompt": "Graphic novel style animated shot, hybrid 2D and 3D animation. Seen from behind at a low three-quarter angle, a young man with curly dark hair, wearing dark hooded streetwear with subtle dark-red accents, dark trousers and light sneakers, and carrying a dark backpack with subtle red detailing, sits on the edge of a high rooftop ledge overlooking a dense city at late sunset, city lights beginning to glow. Subtle wind moves his hair and clothing. He stays mostly still, looking out over the city; near the end he slowly turns his head slightly toward the camera. Slow cinematic camera push-in. Strong ink contours, controlled cel shading, halftone print texture, hand-drawn hatching in the shadows, layered city background with depth, cinematic perspective, limited stepped animation timing. Consistent character, consistent clothing design, stable architecture.",
+  "negative_prompt": "photorealistic, live action, 3D render look, glossy plastic shading, soft airbrushed gradients, blurry, motion blur smear, flickering lines, boiling line art, morphing face, changing hairstyle, changing clothing, extra limbs, deformed hands, warping buildings, melting architecture, text, logo, watermark, signature, speech bubbles, mask, superhero costume",
+  "source_video": null,
+  "reference_assets": [],
+  "input_checksums": {
+    "benchmarks/references/comic_hero_01/rooftop_frame_v001.png": "3a3e76750196317ee5142d7d6d00d2c68af58a993ee54ca8cc9fa665dbf1e0fb"
+  },
+  "start_frame": {
+    "path": "benchmarks/references/comic_hero_01/rooftop_frame_v001.png",
+    "sha256": "3a3e76750196317ee5142d7d6d00d2c68af58a993ee54ca8cc9fa665dbf1e0fb",
+    "original_width": 1672,
+    "original_height": 941,
+    "preprocessing": [
+      "resize 1672x941 -> 1280x720 (lanczos, scale to cover)",
+      "center-crop 1280x720 -> 1280x704 (8 px top, 8 px bottom)"
+    ],
+    "effective_width": 1280,
+    "effective_height": 704,
+    "derived_file": "outputs/comic_rooftop_01/20261004T145422Z-a264ad6e/start_frame_1280x704.png"
+  },
+  "output_video": "outputs/comic_rooftop_01/20261004T145422Z-a264ad6e/out.mp4",
+  "resolution": {
+    "width": 1280,
+    "height": 704
+  },
+  "fps": 24.0,
+  "frame_count": 121,
+  "output_media": {
+    "probe": "ffprobe 6.1.1-3ubuntu5",
+    "width": 1280,
+    "height": 704,
+    "fps": 24.0,
+    "frame_count": 121,
+    "duration_seconds": 5.041667,
+    "codec": "h264"
+  },
+  "gpu": "NVIDIA L4",
+  "vram_gb": 22.03,
+  "validation_time_seconds": 0.008894721000160644,
+  "prepare_time_seconds": 426.14804784199987,
+  "generation_time_seconds": 318.6626950200002,
+  "verification_time_seconds": 1.4858071769999697,
+  "total_time_seconds": 746.3054467400002,
+  "estimated_cost_usd": null,
+  "environment": {
+    "operating_system": "Linux-6.18.41-94.142.amzn2023.x86_64-x86_64-with-glibc2.39",
+    "python_version": "3.11.16",
+    "git_commit": "15822d1f4a614bf000aecaddd944062adf33dfda",
+    "git_dirty": true,
+    "gpu_model": "NVIDIA L4",
+    "gpu_count": 1,
+    "vram_gb": 22.03,
+    "driver_version": "580.178.04",
+    "reported_cuda_version": "13.0",
+    "cuda_version": "12.6",
+    "pytorch_version": "2.8.0+cu126",
+    "env_vars": {
+      "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+      "CUDA_VISIBLE_DEVICES": null,
+      "HF_HUB_OFFLINE": "1"
+    },
+    "torch_version": "2.8.0+cu126",
+    "diffusers_version": "0.36.0",
+    "transformers_version": "4.56.2",
+    "torch_cuda_version": "12.6",
+    "ffmpeg_version": "6.1.1-3ubuntu5"
+  },
+  "quality_metrics": {},
+  "human_rating": null,
+  "notes": "SMOKE TEST - not for evaluation\nwarning: camera_motion, subject_motion, visual_direction not consumed separately: only prompt and negative_prompt are passed to the model, unchanged",
+  "timestamp": "2026-10-04T15:06:49.894290+00:00",
+  "schema_version": 8
+}
