@@ -30,6 +30,10 @@ quality config, tests, documentation. No AI models.
   ([BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md](BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md);
   spike report in `spikes/`). The CLI now stores the automatic quality
   metrics after every successful run.
+  A deterministic style layer (`src/ai_studio/post`,
+  [STYLE_LAYER.md](STYLE_LAYER.md)) post-processes a run's video with an
+  "artist profile" into a derived variant; first two profiles, applied to
+  one clip, not yet judged.
 
 See [PHASE_1_BENCHMARK.md](PHASE_1_BENCHMARK.md).
 

@@ -90,6 +90,7 @@ benchmarks); a clip that still fails after that is flagged for human review.
 | Quality Gate | `src/ai_studio/quality` | Run modular evaluators, compare metrics to `configs/quality.yaml`, return pass/fail per check. **So far:** the first automatic metrics only (motion, start-frame PSNR, temporal pulse, luminance flicker, held frames), measured on demand and stored beside the run records; no thresholds, no pass/fail. See [QUALITY_METRICS.md](QUALITY_METRICS.md). |
 | Diagnose | `src/ai_studio/quality` / `src/ai_studio/repair` | Turn failed checks into located defects (which frames, which region, what kind). |
 | Local repair | `src/ai_studio/repair` | Fix only the located defect; everything outside it is preserved. |
+| Style layer | `src/ai_studio/post` | Deterministic, model-agnostic post-processing: an artist profile (timing, palette, ink, halftone, grain) turns a run's video into a derived, styled variant beside it. CPU only. See [STYLE_LAYER.md](STYLE_LAYER.md). |
 | Orchestration | `src/ai_studio/pipeline` | Wire the stages together and log every run. |
 | Benchmarking | `src/ai_studio/benchmarking` | Record every run's parameters, cost and metrics as immutable JSON. |
 

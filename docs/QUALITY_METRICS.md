@@ -1,4 +1,4 @@
-# Automatic video quality metrics (version 1)
+# Automatic video quality metrics (version 2)
 
 The first automatic, model-agnostic measurements of a generated video: the
 seed of the Quality Gate. They look only at decoded frames, never at the
@@ -37,6 +37,7 @@ All values are on the **0–255 luma scale** unless a unit is given.
 | `temporal_pulse_ratio`, `temporal_pulse_phase_means`, `temporal_pulse_period` | transitions grouped by phase `i % P` (P = 4) and averaged per phase; ratio = highest / lowest phase mean | ratio, 1.0 = no pulse | flicker at regular chunk boundaries |
 | `luminance_flicker` | standard deviation of the per-frame mean luminance after removing its straight-line trend | 0–255 | brightness pumping; a steady fade does not count |
 | `held_frame_ratio` | fraction of transitions with a difference below 0.3 | 0–1 | **not a defect**: tells deliberate holds from a freeze |
+| `hold_pattern_periodicity` *(new in v2)* | highest autocorrelation, at any lag ≥ 1, of the held / new-drawing sequence (transition difference below 0.3 or not) | 1.0 = perfectly mechanical; `null` if there are no holds, only holds, or fewer than 8 transitions | mechanical timing, e.g. a filter holding every second frame regardless of content; hand-timed animation varies its holds |
 | `luminance_min`, `luminance_max` | lowest / highest per-frame mean luminance | 0–255 | context for `luminance_flicker` |
 | `frame_count` | frames decoded | frames | context |
 
@@ -124,7 +125,9 @@ tool_versions {numpy, ffmpeg}, timestamp
 
 - **Never overwritten.** The file is created exclusively; measuring a run
   that already has metrics of the current version is refused.
-- **Versioned.** `METRICS_VERSION` (now `"1"`) changes whenever a definition,
+- **Versioned.** `METRICS_VERSION` (now `"2"`; version 2 added
+  `hold_pattern_periodicity` and left every version-1 metric unchanged, so
+  version-1 values of those metrics remain comparable) changes whenever a definition,
   a default or the decoding changes. A new version writes a new file next to
   the old one; numbers from different versions must not be compared.
 - **Only successful runs with an output video** can be measured.
@@ -163,6 +166,14 @@ Runs that already have metrics are shown with `already measured` and not
 measured again; failed runs and runs whose video is not on this machine are
 listed as skipped. Commit the new `benchmarks/metrics/...json` files like run
 records.
+
+## Derived (post-processed) videos
+
+A styled variant of a run ([STYLE_LAYER.md](STYLE_LAYER.md)) is measured with
+the same metrics, but its record carries `variant: "post/<recipe>"` and is
+written next to the variant (`outputs/<benchmark>/<run_id>/post/<recipe>/`),
+never under `benchmarks/metrics/`. The store refuses to save a variant's
+record in a raw run's place.
 
 ## Not yet
 

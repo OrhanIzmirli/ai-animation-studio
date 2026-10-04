@@ -8,6 +8,11 @@ human evaluations do:
 One file per run and metrics version, created exclusively and never
 overwritten. A new METRICS_VERSION gives a new file beside the old one.
 
+A metrics record describes either the run's own video (variant None) or a
+derived, post-processed variant of it (variant e.g. "post/comic_finish_v1").
+The files above are only ever the raw run's. A variant's metrics are written
+next to the variant itself (save_variant), so the two can never be confused.
+
 Only successful runs with an output_video can be measured. The record keeps
 the SHA-256 of the measured file, so a later measurement of a different file
 under the same run id is detectable (VideoMetricsStore.video_matches).
@@ -57,6 +62,9 @@ class VideoMetricsRecord:
     metrics: dict[str, Any]  # see ai_studio.quality.metrics.compute_metrics
     per_transition_diffs: list[float]  # mean |diff| of frame i -> i+1, 0-255
     tool_versions: dict[str, str | None]  # {"numpy", "ffmpeg"}
+    # None: the run's own output video. Otherwise the derived variant measured,
+    # e.g. "post/comic_finish_v1" (absent in files written before variants existed).
+    variant: str | None = None
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def __post_init__(self) -> None:
@@ -77,6 +85,8 @@ class VideoMetricsRecord:
             raise ValueError("per_transition_diffs must be a list of numbers")
         if not isinstance(self.tool_versions, dict) or set(self.tool_versions) != {"numpy", "ffmpeg"}:
             raise ValueError("tool_versions must be a dict with numpy and ffmpeg")
+        if self.variant is not None and (not isinstance(self.variant, str) or not self.variant.strip()):
+            raise ValueError("variant must be a non-empty string or None")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -93,9 +103,11 @@ def measure_video(
     run_id: str,
     reference_image: str | Path | None = None,
     analysis_width: int = DEFAULT_ANALYSIS_WIDTH,
+    variant: str | None = None,
 ) -> VideoMetricsRecord:
     """Decode `video` and compute every metric. `reference_image` is the
-    start frame as the model received it (for start_frame_psnr), or None."""
+    start frame as the model received it (for start_frame_psnr), or None.
+    `variant` names a derived video (None: the run's own output)."""
     video = Path(video)
     frames = decode_video(video, analysis_width=analysis_width)
     height, width = frames.shape[1:3]
@@ -109,6 +121,7 @@ def measure_video(
         metrics=compute_metrics(frames, reference),
         per_transition_diffs=[round(float(v), 4) for v in transition_diffs(frames)],
         tool_versions={"numpy": np.__version__, "ffmpeg": ffmpeg_version()},
+        variant=variant,
     )
 
 
@@ -165,11 +178,28 @@ class VideoMetricsStore:
     def save(self, record: VideoMetricsRecord) -> Path:
         if not isinstance(record, VideoMetricsRecord):
             raise TypeError("VideoMetricsStore stores VideoMetricsRecord only")
+        if record.variant is not None:
+            raise ValueError(
+                f"these are metrics of the variant {record.variant!r}, not of the run's own video; "
+                "use save_variant()"
+            )
         self.measurable_run(record.benchmark_id, record.run_id)
         path = self.path_for(record.benchmark_id, record.run_id, record.metrics_version)
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = json.dumps(record.to_dict(), indent=2, ensure_ascii=False, allow_nan=False)
         with path.open("x", encoding="utf-8") as f:  # never overwrite
+            f.write(payload + "\n")
+        return path
+
+    def save_variant(self, record: VideoMetricsRecord, directory: str | Path) -> Path:
+        """Write the metrics of a derived variant into the variant's own
+        directory (next to its video and manifest). Never overwrites."""
+        if not isinstance(record, VideoMetricsRecord) or record.variant is None:
+            raise ValueError("save_variant() needs a VideoMetricsRecord with a variant name")
+        self.measurable_run(record.benchmark_id, record.run_id)
+        path = Path(directory) / f"metrics_v{record.metrics_version}.json"
+        payload = json.dumps(record.to_dict(), indent=2, ensure_ascii=False, allow_nan=False)
+        with path.open("x", encoding="utf-8") as f:
             f.write(payload + "\n")
         return path
 

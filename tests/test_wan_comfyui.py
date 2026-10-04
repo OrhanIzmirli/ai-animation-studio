@@ -715,9 +715,9 @@ def test_cli_run_stores_metrics_and_stops_the_server(project, rooftop, comfy_dir
 
     assert code == 0, out
     assert "status: success" in out and "measured: 24 fps, 121 frames" in out
-    assert "metrics: benchmarks/metrics/comic_rooftop_like/cli-1/metrics_v1.json" in out
+    assert "metrics: benchmarks/metrics/comic_rooftop_like/cli-1/metrics_v2.json" in out
     metrics = json.loads(
-        (project / "benchmarks/metrics/comic_rooftop_like/cli-1/metrics_v1.json").read_text(encoding="utf-8")
+        (project / "benchmarks/metrics/comic_rooftop_like/cli-1/metrics_v2.json").read_text(encoding="utf-8")
     )
     assert metrics["metrics"]["frame_count"] == 121
     assert metrics["metrics"]["start_frame_psnr"] is not None  # measured against the derived start frame

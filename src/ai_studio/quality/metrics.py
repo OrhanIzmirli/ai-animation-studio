@@ -19,7 +19,7 @@ from typing import Any
 
 import numpy as np
 
-METRICS_VERSION = "1"
+METRICS_VERSION = "2"  # 2: + hold_pattern_periodicity (all version-1 metrics unchanged)
 
 DEFAULT_PULSE_PERIOD = 4
 HELD_FRAME_THRESHOLD = 0.3  # mean |diff| below this = the frame was held
@@ -155,6 +155,40 @@ def held_frame_ratio(frames: np.ndarray, threshold: float = HELD_FRAME_THRESHOLD
     return float((diffs < threshold).mean()) if len(diffs) else 0.0
 
 
+def hold_pattern_periodicity(held: np.ndarray, max_lag: int | None = None) -> float | None:
+    """How mechanical a hold pattern is: the highest autocorrelation of the
+    held / new-drawing sequence at any lag >= 1.
+
+    held   one boolean per transition: True = the frame repeats the previous
+           one (a hold), False = a new drawing. For a video: the transitions
+           whose difference is below HELD_FRAME_THRESHOLD.
+
+    Detects: mechanical timing, e.g. a filter that holds every second frame
+    regardless of content. Hand-timed animation varies its holds with the
+    action.
+
+    1.0 = perfectly periodic (fixed twos or threes). Lower = less regular.
+    None when the sequence has no variation (no holds at all, or nothing but
+    holds) or is too short: there is no pattern to measure.
+
+    Each lag is normalised by its own overlap, so a strictly periodic
+    sequence scores exactly 1.0. Lags up to half the sequence are examined.
+    """
+    held = np.asarray(held, dtype=np.float64)
+    count = len(held)
+    if count < 8:
+        return None
+    centred = held - held.mean()
+    variance = float((centred * centred).mean())
+    if variance == 0.0:
+        return None
+    max_lag = count // 2 if max_lag is None else min(max_lag, count - 1)
+    best = max(
+        float((centred[:-lag] * centred[lag:]).mean()) / variance for lag in range(1, max_lag + 1)
+    )
+    return float(min(1.0, max(-1.0, best)))
+
+
 def compute_metrics(
     frames: np.ndarray, reference: np.ndarray | None = None, *, pulse_period: int = DEFAULT_PULSE_PERIOD,
 ) -> dict[str, Any]:
@@ -184,4 +218,5 @@ def compute_metrics(
         "luminance_min": rounded(luminance.min()),
         "luminance_max": rounded(luminance.max()),
         "held_frame_ratio": rounded(held_frame_ratio(gray)),
+        "hold_pattern_periodicity": rounded(hold_pattern_periodicity(transition_diffs(gray) < HELD_FRAME_THRESHOLD)),
     }

@@ -1,0 +1,43 @@
+# Artist profile: cel animation photographed on film.
+# Timed by the action, a softer (blended) palette, even and steady ink lines
+# as on a cel, a slight glow around bright areas, film grain. No halftone,
+# no misregistration, no line wobble.
+#
+# A profile is immutable once videos were made with it. To change a habit,
+# copy this file to retro_cel_v2.yaml. Parameters: docs/STYLE_LAYER.md.
+
+name: retro_cel
+version: 1
+description: >-
+  Cel-on-film finish: animator timing, softened palette from the start frame,
+  steady moderate ink lines, slight bloom, film grain.
+seed: 4207
+
+habits:
+  timing:
+    mode: animator
+    still_below: 1.0
+    moderate_below: 3.0
+    hysteresis: 0.2
+    lookahead: 3
+    rhythm_break: [4, 7]
+  palette:
+    k: 32
+    strength: 0.6           # blended with the original: softer than a hard quantise
+  ink:
+    strength: 0.6
+    thickness: [1.0, 2.0]
+    threshold: 34
+    shadow_bias: 0.4
+    contrast_bias: 0.4
+    taper: 0.4
+    pressure_variation: 0.1
+    boil_px: 0.0            # lines traced on cels do not boil
+    noise_scale: 128
+  bloom:
+    threshold: 170
+    radius: 16
+    strength: 0.35
+  grain:
+    amount: 3.5
+    shadow_gain: 0.6

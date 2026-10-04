@@ -1,0 +1,47 @@
+# Artist profile: printed-comic finish.
+# Timed by the action, a limited palette taken from the shot's start frame,
+# brush-like ink contours whose weight follows light and contrast, halftone
+# dots in the shadows, paper grain, and plates one pixel out of register.
+#
+# A profile is immutable once videos were made with it. To change a habit,
+# copy this file to comic_finish_v2.yaml. Parameters: docs/STYLE_LAYER.md.
+
+name: comic_finish
+version: 1
+description: >-
+  Printed-comic finish: animator timing, limited palette from the start
+  frame, content-aware ink lines with slight wobble, halftone shadows, paper
+  grain, 1 px misregistration.
+seed: 1701          # the artist's hand: every noise field derives from it
+
+habits:
+  timing:
+    mode: animator
+    still_below: 1.0        # motion below this: on threes
+    moderate_below: 3.0     # below this: on twos; above: on ones
+    hysteresis: 0.2
+    lookahead: 3
+    rhythm_break: [3, 6]
+  palette:
+    k: 24
+    strength: 1.0
+  ink:
+    strength: 0.75
+    thickness: [1.0, 3.5]   # line weight range in pixels
+    threshold: 36
+    shadow_bias: 0.6        # heavier in shadow, lighter in highlights
+    contrast_bias: 0.4      # heavier at strong edges
+    taper: 0.6              # thinner toward line ends
+    pressure_variation: 0.25
+    boil_px: 0.6            # wobble between drawings, never inside a hold
+    noise_scale: 96
+  halftone:
+    dot_size: 6
+    threshold: 55           # shadows only
+    strength: 0.4
+    variation: 0.15
+  grain:
+    amount: 2.5
+    shadow_gain: 1.0        # twice as strong in black as in white
+  misregistration:
+    px: 1

@@ -91,16 +91,20 @@ def _decode(path: Path, size: tuple[int, int], gray: bool, extra: list[str]) -> 
 
 
 def decode_video(
-    path: str | Path, *, analysis_width: int = DEFAULT_ANALYSIS_WIDTH, gray: bool = True,
+    path: str | Path, *, analysis_width: int | None = DEFAULT_ANALYSIS_WIDTH, gray: bool = True,
 ) -> np.ndarray:
-    """All frames of the first video stream, scaled to the analysis size.
+    """All frames of the first video stream, scaled to the analysis size
+    (analysis_width=None: the video's own size, no scaling).
     (N, H, W) uint8 when gray, else (N, H, W, 3) uint8 RGB."""
     path = Path(path)
     if not path.is_file():
         raise FrameDecodeError(f"video not found: {path}")
     _ffmpeg()  # the clear "ffmpeg missing" error comes before any probing
     info = ffprobe_video(path)
-    size = analysis_size(info.width, info.height, analysis_width)
+    size = (
+        (info.width, info.height) if analysis_width is None
+        else analysis_size(info.width, info.height, analysis_width)
+    )
     # passthrough: exactly the encoded frames, no duplicated or dropped ones
     return _decode(path, size, gray, ["-map", "0:v:0", "-fps_mode", "passthrough"])
 

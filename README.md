@@ -40,6 +40,8 @@ Running locally on an 8 GB GPU with the Turbo model through ComfyUI:
 [docs/BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md](docs/BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md).
 Automatic video metrics (measurements only, no thresholds yet):
 [docs/QUALITY_METRICS.md](docs/QUALITY_METRICS.md).
+Hand-made finish as deterministic post-processing (artist profiles):
+[docs/STYLE_LAYER.md](docs/STYLE_LAYER.md).
 
 > No modification is considered an improvement until it beats the previous
 > version on the fixed benchmark suite.
@@ -60,7 +62,8 @@ src/ai_studio/
   generation/     capability contracts, requests, placeholder adapters
   segmentation/   masks / regions to preserve or repair (future)
   tracking/       tracking regions across frames (future)
-  quality/        automatic video metrics (first version; no thresholds yet)
+  quality/        automatic video metrics (no thresholds yet)
+  post/           style layer: timing, palette, ink, halftone, grain (CPU only)
   repair/         local repair (future)
   pipeline/       orchestration of the stages (future)
   media_probe.py  measures output videos with ffprobe
