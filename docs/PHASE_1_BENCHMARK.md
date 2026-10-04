@@ -144,8 +144,10 @@ resolution, the measured output video (`output_media`; `fps` / `frame_count`
 are the measured values, or the backend-reported ones when nothing could be
 measured), all effective
 backend parameters (requested values plus defaults the backend applied; any
-value the backend changed is noted), environment (OS, Python, git commit and
-dirty flag, GPU, VRAM, driver, CUDA, PyTorch, backend library versions, and
+value the backend changed is noted), the run's purpose
+(`task_parameters.run_purpose`: `benchmark`, `smoke` or `experiment`; only
+`benchmark` runs are meant to be rated), environment (OS, Python, git commit,
+git status, GPU, VRAM, driver, CUDA, PyTorch, backend library versions, and
 `env_vars`: the process environment variables `PYTORCH_CUDA_ALLOC_CONF`,
 `CUDA_VISIBLE_DEVICES` and `HF_HUB_OFFLINE`, `null` when unset),
 a per-stage timing breakdown, estimated cost when supplied, the run
@@ -194,6 +196,26 @@ fields, so the runner stays model-agnostic; tests inject a fake probe through
 
 ffprobe (part of FFmpeg) must be on `PATH` to run any benchmark that pins fps
 or a duration tolerance.
+
+### Provenance details
+
+- **`git_dirty`** is true only when something *outside the data folders* is
+  modified, staged or untracked, i.e. when the commit hash does not reproduce
+  the code. Changes under `benchmarks/results/`, `benchmarks/metrics/`,
+  `benchmarks/evaluations/`, `benchmarks/comic_evaluations/` and `outputs/`
+  do not count, because every recorded run adds files there.
+  `git_untracked_data_only` is true when such data changes were the only
+  ones, and `git_status` keeps the raw `git status --porcelain` lines (up to
+  200), so nothing is hidden.
+- **`pytorch_version` / `cuda_version`** name the torch that actually ran the
+  model and are reported by the backend; they are `null` when no backend
+  reported them (e.g. a run that failed before generating). The torch of the
+  process that drives the run is recorded as `orchestrator_pytorch_version` /
+  `orchestrator_cuda_version`. They differ when a backend runs the model in
+  another program, such as ComfyUI. In records made before this split
+  (2026-10-04), `pytorch_version` is the orchestrator's torch.
+- **`run_purpose`** is set with `--purpose` on the command line (default
+  `benchmark`). `scripts/camber_run.py --smoke` sets `smoke`.
 
 ### Failed runs are benchmark data
 

@@ -104,6 +104,7 @@ def build_command(args: argparse.Namespace, run_id: str, project_root: Path) -> 
         str(ENV_PYTHON), "-u", str(project_root / "scripts" / "run_benchmark.py"),
         "--benchmark", args.benchmark, "--backend", args.backend, "--seed", str(args.seed),
         "--width", str(args.width), "--height", str(args.height), "--run-id", run_id,
+        "--purpose", "smoke" if args.smoke else args.purpose,
     ]
     for param in params:
         command += ["--param", param]
@@ -146,6 +147,10 @@ def build_parser() -> argparse.ArgumentParser:
              "unless you set them yourself",
     )
     parser.add_argument("--notes", default="")
+    parser.add_argument(
+        "--purpose", choices=("benchmark", "smoke", "experiment"), default="benchmark",
+        help="stored in the record; --smoke implies smoke",
+    )
     parser.add_argument(
         "--smoke", action="store_true",
         help="quick end-to-end check: 2 denoising steps, marked as not for evaluation",

@@ -206,6 +206,7 @@ def test_generation_run_records_everything(runner, generation_request_factory, i
         "camera_motion": "slow push-in",
         "subject_motion": ["mostly stationary", "slight head turn"],
         "visual_direction": {"style": "graphic novel", "line": "strong ink contours"},
+        "run_purpose": "benchmark",
     }
     assert data["fps"] == 24 and data["frame_count"] == 120
     assert data["model_parameters"] == {"steps": 40, "sampler": "fake"}
@@ -247,8 +248,26 @@ def test_conflicting_benchmark_id_rejected(runner, request_factory):
 def test_editing_run_unchanged_and_tagged(runner, request_factory):
     record = runner.run(request_factory(), FakeBackend())
     assert record.task_type == "video_editing"
-    assert record.task_parameters == {}
+    assert record.task_parameters == {"run_purpose": "benchmark"}
     assert record.source_video == "benchmarks/inputs/source.mp4"
+
+
+@pytest.mark.parametrize("purpose", ["benchmark", "smoke", "experiment"])
+def test_run_purpose_is_recorded_for_success_and_failure(runner, generation_request_factory, purpose):
+    record = runner.run(generation_request_factory(), FakeGenerationBackend(), benchmark_id=BENCH,
+                        run_id="ok", purpose=purpose)
+    assert record.task_parameters["run_purpose"] == purpose
+    with pytest.raises(BenchmarkRunError) as exc_info:
+        runner.run(generation_request_factory(), FakeGenerationBackend(fail_in="generate", exc=ValueError("x")),
+                   benchmark_id=BENCH, run_id="bad", purpose=purpose)
+    assert exc_info.value.record.task_parameters["run_purpose"] == purpose
+
+
+def test_unknown_run_purpose_is_rejected_before_anything_runs(runner, generation_request_factory):
+    backend = FakeGenerationBackend()
+    with pytest.raises(ValueError, match="purpose must be one of"):
+        runner.run(generation_request_factory(), backend, benchmark_id=BENCH, purpose="demo")
+    assert backend.calls == [] and runner.logger.list_runs(BENCH) == []
 
 
 @pytest.mark.parametrize("kind", ["generation_request_on_editing_backend", "editing_request_on_generation_backend"])

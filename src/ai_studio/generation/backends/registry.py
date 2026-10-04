@@ -12,12 +12,13 @@ from ai_studio.generation.backends.joyai import JoyAIVideoEditBackend
 from ai_studio.generation.backends.kiwi import KiwiEditBackend
 from ai_studio.generation.backends.wan_editctrl import WanEditCtrlBackend
 from ai_studio.generation.backends.wan_ti2v import WanTI2V5BBackend
-from ai_studio.generation.backends.wan_turbo_comfyui import WanTurboComfyUIBackend
+from ai_studio.generation.backends.wan_comfyui import WanBaseComfyUIBackend, WanTurboComfyUIBackend
 
 # Keys are each backend's metadata().backend_name.
 BACKENDS: dict[str, type[VideoBackend]] = {
     "wan-ti2v-5b": WanTI2V5BBackend,
     "wan-ti2v-5b-turbo-comfyui": WanTurboComfyUIBackend,
+    "wan-ti2v-5b-comfyui": WanBaseComfyUIBackend,
     "joyai-video-edit": JoyAIVideoEditBackend,
     "kiwi-edit": KiwiEditBackend,
     "wan2.2-vace-fun-a14b-editctrl": WanEditCtrlBackend,

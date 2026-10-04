@@ -147,9 +147,12 @@ for `start_frame_psnr`. Output:
 
 ```
 benchmark comic_rooftop_01, metrics v1 (0-255 luma scale; psnr in dB)
-run                        steps  motion_mean  total_change  start_psnr  pulse_ratio  flicker  held_ratio  note
-20261004T145422Z-a264ad6e  2      0.689        4.150         41.66       2.41         0.250    0.058       measured
+run                        purpose  steps  motion_mean  total_change  start_psnr  pulse_ratio  flicker  held_ratio  note
+20261004T145422Z-a264ad6e  -        2      0.689        4.150         41.66       2.41         0.250    0.058       measured
 ```
+
+`purpose` is the run's `run_purpose` (`benchmark`, `smoke`, `experiment`);
+`-` for records made before purposes were recorded.
 
 `scripts/run_benchmark.py` does this automatically after every successful
 run (`--no-metrics` skips it). A failure there only prints a warning: the run

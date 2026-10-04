@@ -344,6 +344,7 @@ def test_prepare_loads_the_pinned_revision_as_documented(fake_stack):
     assert backend.metadata().model_version == "0123abc"  # the resolved snapshot commit
     assert backend._make_generator(7) == ("generator", "cuda", 7)
     assert backend._environment == {
+        "pytorch_version": "2.8.0+cu126", "cuda_version": "12.6",  # the torch that ran the model
         "torch_version": "2.8.0+cu126", "diffusers_version": "0.36.0",
         "transformers_version": "4.56.2", "torch_cuda_version": "12.6",
     }

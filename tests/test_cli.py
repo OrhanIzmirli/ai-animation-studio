@@ -16,6 +16,7 @@ from ai_studio.generation.backends import (
     JoyAIVideoEditBackend,
     KiwiEditBackend,
     VideoBackend,
+    WanBaseComfyUIBackend,
     WanEditCtrlBackend,
     WanTI2V5BBackend,
     WanTurboComfyUIBackend,
@@ -43,6 +44,7 @@ def test_registry_lists_every_backend_by_its_backend_name():
     assert BACKENDS == {
         "wan-ti2v-5b": WanTI2V5BBackend,
         "wan-ti2v-5b-turbo-comfyui": WanTurboComfyUIBackend,
+        "wan-ti2v-5b-comfyui": WanBaseComfyUIBackend,
         "joyai-video-edit": JoyAIVideoEditBackend,
         "kiwi-edit": KiwiEditBackend,
         "wan2.2-vace-fun-a14b-editctrl": WanEditCtrlBackend,
@@ -198,6 +200,28 @@ def test_run_benchmark_returns_written_project_relative_paths(cli_project):
     assert written == ["benchmarks/results/cli_01/run-2.json", "outputs/cli_01/run-2"]
     assert all((cli_project / path).exists() for path in written)
     assert any(line.startswith("status: success") for line in lines)
+
+
+@pytest.mark.parametrize(
+    "extra, expected", [((), "benchmark"), (("--purpose", "smoke"), "smoke"), (("--purpose", "experiment"), "experiment")],
+)
+def test_purpose_is_stored_in_task_parameters(cli_project, capsys, extra, expected):
+    assert main(argv("cli_01", "fake-gen", "--run-id", "p", *extra)) == 0
+    assert f"purpose: {expected}" in capsys.readouterr().out
+    record = json.loads((cli_project / "benchmarks/results/cli_01/p.json").read_text(encoding="utf-8"))
+    assert record["task_parameters"]["run_purpose"] == expected
+    assert record["schema_version"] == 8  # no schema bump: task_parameters is free-form
+
+
+def test_unknown_purpose_is_a_bad_argument(cli_project, capsys):
+    with pytest.raises(SystemExit) as exc_info:
+        main(argv("cli_01", "fake-gen", "--purpose", "demo"))
+    assert exc_info.value.code == 2
+    code, written = run_benchmark(
+        benchmark="cli_01", backend="fake-gen", seed=1, width=1280, height=704, purpose="demo",
+        out=lambda line: None,
+    )
+    assert code == 2 and written == []
 
 
 def test_generated_run_id_is_used_when_none_is_given(cli_project):

@@ -351,10 +351,11 @@ allocator setting is stored in every record.
 
 - **Only a 2-step smoke run has succeeded so far**; see the status note at
   the top.
-- **`git_dirty` after the first run.** Record files are untracked until you
-  commit them on Windows, so once a run has been recorded on Camber, later
-  records there show `git_dirty: true` even though the code is unchanged.
-  The commit hash is still correct.
+- **`git_dirty` and earlier runs.** Record, metrics and output files of
+  earlier runs no longer make a run "dirty": `git_dirty` is true only when
+  something outside the data folders changed. `git_untracked_data_only` and
+  the raw `git_status` lines are recorded as well. Records made before this
+  change may show `git_dirty: true` just because older records were present.
 - With `vae_tiling=true` the decoded pixels can differ slightly from an
   untiled decode. All L4 runs use it, so they are comparable with each
   other; the setting is in every record.

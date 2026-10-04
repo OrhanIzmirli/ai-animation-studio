@@ -11,6 +11,10 @@ VideoGenerationRequest (generation):
     prompt, negative_prompt, reference_images, output_resolution, seed,
     backend_parameters      generic fields copied into the record
 
+Every record also gets task_parameters["run_purpose"]: "benchmark" (default),
+"smoke" or "experiment", given by the caller. It is metadata about the run,
+not part of the request.
+
 It never inspects backend_parameters or result.parameters; it copies them
 into the record.
 
@@ -76,6 +80,9 @@ from ai_studio.media_probe import ProbeUnavailableError, VideoInfo, ffprobe_vide
 from ai_studio.paths import project_root, resolve_path, to_project_relative
 
 MAX_ERROR_MESSAGE_CHARS = 4000
+# Why a run was made; stored as task_parameters["run_purpose"]. Only
+# "benchmark" runs are meant to be rated and compared.
+RUN_PURPOSES = ("benchmark", "smoke", "experiment")
 FPS_TOLERANCE = 0.01  # 23.976 != 24
 
 TaskRequest = BenchmarkRequest | VideoGenerationRequest
@@ -119,6 +126,7 @@ class _Run:
     meta: BackendMetadata
     estimated_cost_usd: float | None
     notes: str
+    purpose: str = "benchmark"
     result: GenerationResult | None = None
     checksums: dict[str, str] = dataclasses.field(default_factory=dict)
     timings: dict[str, float] = dataclasses.field(default_factory=dict)
@@ -153,6 +161,7 @@ class BenchmarkRunner:
         run_id: str | None = None,
         estimated_cost_usd: float | None = None,
         notes: str = "",
+        purpose: str = "benchmark",
     ) -> BenchmarkResult:
         """Run a benchmark definition. Refuses drafts before anything else
         happens: no backend call, no output directory, no record."""
@@ -167,7 +176,7 @@ class BenchmarkRunner:
         )
         return self.run(
             request, backend, benchmark_id=definition.benchmark_id, run_id=run_id,
-            estimated_cost_usd=estimated_cost_usd, notes=notes,
+            estimated_cost_usd=estimated_cost_usd, notes=notes, purpose=purpose,
         )
 
     def run(
@@ -179,12 +188,15 @@ class BenchmarkRunner:
         run_id: str | None = None,
         estimated_cost_usd: float | None = None,
         notes: str = "",
+        purpose: str = "benchmark",
     ) -> BenchmarkResult:
         """Run a request directly. `benchmark_id` is required for requests that
         do not carry one (VideoGenerationRequest); for BenchmarkRequest it may
         be omitted. Benchmark definitions should go through run_definition(),
         which enforces the draft/ready lifecycle."""
         benchmark_id = self._benchmark_id(request, benchmark_id)
+        if purpose not in RUN_PURPOSES:
+            raise ValueError(f"purpose must be one of {RUN_PURPOSES}, got {purpose!r}")
         if not backend.supports(request.capability):
             raise UnsupportedCapabilityError(
                 f"{type(backend).__name__} supports "
@@ -204,7 +216,7 @@ class BenchmarkRunner:
 
         # Backends always receive absolute paths, independent of the cwd.
         resolved = request.with_resolved_paths(lambda p: str(resolve_path(p, self.root)))
-        run = _Run(benchmark_id, run_id, request, self._metadata(backend), estimated_cost_usd, notes)
+        run = _Run(benchmark_id, run_id, request, self._metadata(backend), estimated_cost_usd, notes, purpose)
 
         stage = "validation"
         run_start = stage_start = time.perf_counter()
@@ -384,7 +396,7 @@ class BenchmarkRunner:
             benchmark_id=run.benchmark_id,
             run_id=run.run_id,
             task_type=request.capability.value,
-            task_parameters=request.task_parameters(),
+            task_parameters={**request.task_parameters(), "run_purpose": run.purpose},
             **(failure or {}),
             backend=valid_result.backend_name if valid_result else meta.backend_name,
             backend_version=valid_result.backend_version if valid_result else meta.backend_version,

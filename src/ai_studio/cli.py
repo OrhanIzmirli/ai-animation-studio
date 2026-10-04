@@ -2,7 +2,11 @@
 
     python scripts/run_benchmark.py --benchmark comic_rooftop_01 --backend wan-ti2v-5b
         --seed 42 --width 1280 --height 704 [--param key=value ...] [--notes TEXT]
-        [--no-metrics]
+        [--purpose benchmark|smoke|experiment] [--no-metrics]
+
+--purpose says why the run is made (default: benchmark) and is stored in the
+record as task_parameters["run_purpose"]; smoke tests and experiments can
+then be told apart from runs meant for evaluation.
 
 After a successful run the automatic quality metrics are computed and stored
 (benchmarks/metrics/...). That step is not part of the run: if it fails, a
@@ -39,6 +43,7 @@ from ai_studio.benchmarking import (
     load_definition,
     new_run_id,
 )
+from ai_studio.benchmarking.runner import RUN_PURPOSES
 from ai_studio.benchmarking.schema import check_file_name_safe
 from ai_studio.generation.backends import BackendNotInstalledError
 from ai_studio.generation.backends.registry import get_backend
@@ -96,6 +101,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--notes", default="", help="free text stored in the record")
     parser.add_argument("--run-id", default=None, help="default: a new timestamped id")
     parser.add_argument(
+        "--purpose", choices=RUN_PURPOSES, default="benchmark",
+        help="why this run is made; stored in the record (default: benchmark)",
+    )
+    parser.add_argument(
         "--no-metrics", action="store_true",
         help="do not compute the automatic quality metrics after a successful run",
     )
@@ -112,6 +121,7 @@ def run_benchmark(
     parameters: dict[str, Any] | None = None,
     notes: str = "",
     run_id: str | None = None,
+    purpose: str = "benchmark",
     metrics: bool = True,
     media_probe: Callable[[Path], VideoInfo] | None = None,
     out: Callable[[str], None] = print,
@@ -131,6 +141,8 @@ def run_benchmark(
         resolution = Resolution(width=width, height=height)
         run_id = run_id or new_run_id()
         check_file_name_safe("run_id", run_id)
+        if purpose not in RUN_PURPOSES:
+            raise ValueError(f"purpose must be one of {RUN_PURPOSES}, got {purpose!r}")
     except (OSError, KeyError, ValueError, RuntimeError) as exc:
         return _setup_problem(exc, out)
 
@@ -139,12 +151,12 @@ def run_benchmark(
         logger, outputs_dir(root), root=root, media_probe=media_probe or ffprobe_video,
     )
     out(f"benchmark: {definition.benchmark_id}   backend: {backend}   seed: {seed}   "
-        f"resolution: {width}x{height}   run_id: {run_id}")
+        f"resolution: {width}x{height}   purpose: {purpose}   run_id: {run_id}")
     try:
         try:
             record = runner.run_definition(
                 definition, backend_instance, seed=seed, output_resolution=resolution,
-                backend_parameters=dict(parameters or {}), run_id=run_id, notes=notes,
+                backend_parameters=dict(parameters or {}), run_id=run_id, notes=notes, purpose=purpose,
             )
         finally:
             # A backend that started something (e.g. a local server) stops it here.
@@ -249,7 +261,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     code, _ = run_benchmark(
         benchmark=args.benchmark, backend=args.backend, seed=args.seed, width=args.width,
         height=args.height, parameters=parameters, notes=args.notes, run_id=args.run_id,
-        metrics=not args.no_metrics,
+        purpose=args.purpose, metrics=not args.no_metrics,
     )
     return code
 

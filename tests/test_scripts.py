@@ -305,9 +305,20 @@ def test_camber_run_defaults():
     assert Path(command[2]).name == "run_benchmark.py"
     assert command[3:] == [
         "--benchmark", "comic_rooftop_01", "--backend", "wan-ti2v-5b", "--seed", "42",
-        "--width", "1280", "--height", "704", "--run-id", "RUN",
+        "--width", "1280", "--height", "704", "--run-id", "RUN", "--purpose", "benchmark",
         "--param", "cpu_offload=true", "--param", "vae_tiling=true",
     ]
+
+
+def purpose_of(command):
+    return command[command.index("--purpose") + 1]
+
+
+def test_camber_run_smoke_implies_purpose_smoke():
+    assert purpose_of(camber_run.build_command(run_args("--smoke"), "RUN", Path("/p"))) == "smoke"
+    assert purpose_of(camber_run.build_command(run_args("--purpose", "experiment"), "RUN", Path("/p"))) == "experiment"
+    # --smoke wins: a 2-step run is never a benchmark or experiment result
+    assert purpose_of(camber_run.build_command(run_args("--smoke", "--purpose", "benchmark"), "RUN", Path("/p"))) == "smoke"
 
 
 def test_camber_run_extra_params_and_cpu_offload_override():

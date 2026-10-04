@@ -1,10 +1,17 @@
-"""Wan 2.2 TI2V-5B *Turbo* (GGUF Q8_0) through a local ComfyUI.
+"""Wan 2.2 TI2V-5B GGUF models through a local ComfyUI: two backends, one
+implementation.
 
-NOT the base Wan 2.2 TI2V-5B: Turbo is quanhaol's distilled finetune of it
-(4 steps, CFG 1). It has its own backend name and model identity so that its
-results are never mixed with the base model's. See
+    wan-ti2v-5b-turbo-comfyui   WanTurboComfyUIBackend
+        quanhaol's *Turbo* finetune (distilled: 4 steps, CFG 1), Q8_0 GGUF.
+        NOT the base model.
+    wan-ti2v-5b-comfyui         WanBaseComfyUIBackend
+        the base Wan 2.2 TI2V-5B, Q8_0 GGUF (20 steps, CFG 5).
+
+They are different models, so each has its own backend name, model name and
+GGUF hash, and their results are never mixed. They share the workflow, the
+ComfyUI lifecycle and the tiled decode. See
 docs/BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md and spikes/LOCAL_COMFYUI_SPIKE.md
-(the settings are the spike's run (d)).
+(the Turbo defaults are the spike's run (d)).
 
 The adapter owns the ComfyUI process: prepare() starts it headless on
 127.0.0.1 (or reuses one already answering on the configured port) and
@@ -27,7 +34,7 @@ import shutil
 import time
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from ai_studio.generation.backends.base import (
     BackendMetadata,
@@ -35,7 +42,6 @@ from ai_studio.generation.backends.base import (
     VideoGenerationBackend,
 )
 from ai_studio.generation.backends.comfyui import (
-    MODEL_KINDS,
     ComfyUIConfig,
     ComfyUIServer,
     git_commit,
@@ -55,12 +61,9 @@ from ai_studio.generation.request import VideoGenerationRequest
 from ai_studio.generation.result import GenerationResult
 from ai_studio.system_memory import LowestAvailableRam, available_ram_gb, total_ram_gb
 
-BACKEND_NAME = "wan-ti2v-5b-turbo-comfyui"
 BACKEND_VERSION = "comfyui-0.1"
-MODEL_NAME = "Wan2.2-TI2V-5B-Turbo (quanhaol) GGUF Q8_0"
-WORKFLOW_VERSION = "i2v-turbo-tiled-v1"
 
-CFG = 1.0  # the Turbo model is distilled for CFG 1; not a parameter
+# Turbo: distilled for CFG 1, so guidance is fixed and not a parameter.
 DEFAULTS = {
     "num_inference_steps": 4,
     "shift": 8.0,
@@ -70,6 +73,9 @@ DEFAULTS = {
     "latent_scale": 1.0,
 }
 ALLOWED_BACKEND_PARAMETERS = tuple(DEFAULTS)
+TURBO_GUIDANCE = 1.0
+# Base model: the values of ComfyUI's own template for it.
+BASE_DEFAULTS = {**DEFAULTS, "num_inference_steps": 20, "guidance_scale": 5.0}
 SPATIAL_TILE_OVERLAP = 64
 TEMPORAL_TILE_OVERLAP = 8
 # Below this much available RAM before loading, the run gets a warning. In the
@@ -84,7 +90,7 @@ REQUIRED_NODES = (
     "ModelSamplingSD3", "Wan22ImageToVideoLatent", "KSampler", "VAEDecodeTiled", "SaveImage",
 )
 LATENT_SCALE_NODE = "LatentMultiply"
-# Which node input lists each model file.
+# Which node input lists each model file ("unet" = the backend's own GGUF).
 MODEL_INPUTS = {
     "unet": ("UnetLoaderGGUF", "unet_name"),
     "text_encoder": ("CLIPLoader", "clip_name"),
@@ -116,7 +122,10 @@ def build_workflow(
     *, models: dict[str, str], image_name: str, prompt: str, negative_prompt: str,
     width: int, height: int, num_frames: int, seed: int, settings: dict[str, Any], output_prefix: str,
 ) -> dict[str, Any]:
-    """The ComfyUI API-format workflow (spike run (d))."""
+    """The ComfyUI API-format workflow (spike run (d)). `models` maps
+    unet / text_encoder / vae to file names; CFG is settings["guidance_scale"]
+    (1.0 when absent)."""
+    cfg = float(settings.get("guidance_scale", TURBO_GUIDANCE))
     workflow: dict[str, Any] = {
         "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": models["unet"]}},
         "2": {"class_type": "CLIPLoader", "inputs": {
@@ -132,7 +141,7 @@ def build_workflow(
             "batch_size": 1, "start_image": ["4", 0],
         }},
         "9": {"class_type": "KSampler", "inputs": {
-            "model": ["7", 0], "seed": seed, "steps": settings["num_inference_steps"], "cfg": CFG,
+            "model": ["7", 0], "seed": seed, "steps": settings["num_inference_steps"], "cfg": cfg,
             "sampler_name": settings["sampler"], "scheduler": settings["scheduler"],
             "positive": ["5", 0], "negative": ["6", 0], "latent_image": ["8", 0], "denoise": 1.0,
         }},
@@ -175,10 +184,17 @@ class _RemoteFrames:
         return (self[index] for index in range(len(self)))
 
 
-class WanTurboComfyUIBackend(VideoGenerationBackend):
-    """Image-to-video with the Wan 2.2 TI2V-5B Turbo GGUF in a local ComfyUI."""
+class WanComfyUIBackend(VideoGenerationBackend):
+    """Image-to-video with a Wan 2.2 TI2V-5B GGUF in a local ComfyUI. The
+    concrete backends below set the identity, the GGUF and the defaults."""
 
     supports_start_frame = True
+    backend_name: ClassVar[str]
+    model_name: ClassVar[str]
+    workflow_version: ClassVar[str]
+    unet_kind: ClassVar[str]  # key of this backend's GGUF in the config's `models`
+    defaults: ClassVar[dict[str, Any]]  # the allowed backend_parameters and their defaults
+    fixed_guidance: ClassVar[float | None] = None  # set: CFG is not a parameter
 
     def __init__(self, config: ComfyUIConfig | None = None) -> None:
         """`config`: None reads configs/comfyui.local.yaml when first needed."""
@@ -189,7 +205,7 @@ class WanTurboComfyUIBackend(VideoGenerationBackend):
         self._latent_scale_needed = False
         self._ram_before_gb: float | None = None
 
-    def __enter__(self) -> WanTurboComfyUIBackend:
+    def __enter__(self) -> WanComfyUIBackend:
         return self
 
     def __exit__(self, *exc_info: object) -> None:
@@ -204,13 +220,30 @@ class WanTurboComfyUIBackend(VideoGenerationBackend):
     def metadata(self) -> BackendMetadata:
         pinned = None
         try:
-            pinned = self._hashes.get("unet") or self._load_config().sha256.get("unet")
+            pinned = self._hashes.get("unet") or self._load_config().sha256.get(self.unet_kind)
         except BackendNotInstalledError:
             pass  # metadata must work without ComfyUI configured
         return BackendMetadata(
-            backend_name=BACKEND_NAME, backend_version=BACKEND_VERSION, model_name=MODEL_NAME,
-            model_version=pinned or "unverified", workflow_version=WORKFLOW_VERSION,
+            backend_name=self.backend_name, backend_version=BACKEND_VERSION, model_name=self.model_name,
+            model_version=pinned or "unverified", workflow_version=self.workflow_version,
         )
+
+    def _models(self, config: ComfyUIConfig) -> dict[str, str]:
+        """unet / text_encoder / vae file names for this backend."""
+        if self.unet_kind not in config.models:
+            raise BackendNotInstalledError(
+                f"the ComfyUI configuration has no models.{self.unet_kind} entry, "
+                f"which the {self.backend_name} backend needs"
+            )
+        return {
+            "unet": config.models[self.unet_kind],
+            "text_encoder": config.models["text_encoder"],
+            "vae": config.models["vae"],
+        }
+
+    def _kind(self, name: str) -> str:
+        """Config key for one of unet / text_encoder / vae."""
+        return self.unet_kind if name == "unet" else name
 
     def _load_config(self) -> ComfyUIConfig:
         if self._config is None:
@@ -244,16 +277,16 @@ class WanTurboComfyUIBackend(VideoGenerationBackend):
         # prepare() takes no request, so remember which optional node it must verify.
         self._latent_scale_needed = settings["latent_scale"] != 1.0
 
-    @staticmethod
-    def _settings(request: VideoGenerationRequest) -> dict[str, Any]:
+    @classmethod
+    def _settings(cls, request: VideoGenerationRequest) -> dict[str, Any]:
         """Effective backend parameters: requested values over the defaults."""
         parameters = request.backend_parameters
-        unknown = sorted(set(parameters) - set(ALLOWED_BACKEND_PARAMETERS))
+        unknown = sorted(set(parameters) - set(cls.defaults))
         if unknown:
-            raise ValueError(
-                f"unknown backend_parameters {unknown}; allowed: {list(ALLOWED_BACKEND_PARAMETERS)}"
-            )
-        settings = {**DEFAULTS, **parameters}
+            raise ValueError(f"unknown backend_parameters {unknown}; allowed: {list(cls.defaults)}")
+        settings = {**cls.defaults, **parameters}
+        if cls.fixed_guidance is not None:
+            settings["guidance_scale"] = cls.fixed_guidance
 
         def is_number(value: Any) -> bool:
             return isinstance(value, (int, float)) and not isinstance(value, bool)
@@ -271,7 +304,10 @@ class WanTurboComfyUIBackend(VideoGenerationBackend):
             raise ValueError("spatial_tile must be an int between 64 and 4096, divisible by 32")
         if not is_number(settings["latent_scale"]) or not 0 < settings["latent_scale"] <= 10:
             raise ValueError("latent_scale must be a number in (0, 10]")
-        settings["shift"], settings["latent_scale"] = float(settings["shift"]), float(settings["latent_scale"])
+        if not is_number(settings["guidance_scale"]) or settings["guidance_scale"] < 1:
+            raise ValueError("guidance_scale must be a number >= 1")
+        for name in ("shift", "latent_scale", "guidance_scale"):
+            settings[name] = float(settings[name])
         return settings
 
     # --- ComfyUI lifecycle ---
@@ -283,8 +319,9 @@ class WanTurboComfyUIBackend(VideoGenerationBackend):
         config = self._load_config()
         if not config.comfyui_dir.is_dir():
             raise BackendNotInstalledError(f"ComfyUI not found: {config.comfyui_dir} is not a directory")
-        paths = {kind: config.model_path(kind) for kind in MODEL_KINDS}
-        missing = [f"{kind}: {config.models[kind]}" for kind, path in paths.items() if path is None]
+        models = self._models(config)
+        paths = {name: config.model_path(self._kind(name)) for name in models}
+        missing = [f"{name}: {models[name]}" for name, path in paths.items() if path is None]
         if missing:
             raise BackendNotInstalledError(
                 f"model files not found under {config.comfyui_dir / 'models'}: {', '.join(missing)}"
@@ -294,11 +331,12 @@ class WanTurboComfyUIBackend(VideoGenerationBackend):
         started = time.perf_counter()
         hashes = {kind: sha256_file(path) for kind, path in paths.items()}
         hash_seconds = time.perf_counter() - started
-        for kind, expected in config.sha256.items():
-            if hashes[kind] != expected:
+        for name, actual in hashes.items():
+            expected = config.sha256.get(self._kind(name))
+            if expected is not None and actual != expected:
                 raise BackendNotInstalledError(
-                    f"{config.models[kind]} has sha256 {hashes[kind]}, but the configuration pins "
-                    f"{expected}: it is not the expected {kind} file"
+                    f"{models[name]} has sha256 {actual}, but the configuration pins "
+                    f"{expected}: it is not the expected {name} file"
                 )
         self._hashes = hashes
 
@@ -314,6 +352,9 @@ class WanTurboComfyUIBackend(VideoGenerationBackend):
         torch_version = stats.get("pytorch_version")
         cuda_build = re.search(r"\+(cu\d+|cpu)", torch_version or "")
         self._environment = {
+            # The torch that runs the model is ComfyUI's, not this process's.
+            "pytorch_version": torch_version,
+            "cuda_version": _cuda_version(cuda_build.group(1)) if cuda_build else None,
             "comfyui_commit": git_commit(config.comfyui_dir),
             "comfyui_gguf_commit": git_commit(config.comfyui_dir / "custom_nodes" / "ComfyUI-GGUF"),
             "comfyui_version": stats.get("comfyui_version"),
@@ -327,7 +368,7 @@ class WanTurboComfyUIBackend(VideoGenerationBackend):
     def _check_nodes(self, server: ComfyUIServer) -> None:
         """Every node class, input and model file the workflow needs must exist
         in the running ComfyUI; otherwise the backend is not installed."""
-        config = server.config
+        config, models = server.config, self._models(server.config)
         needed = REQUIRED_NODES + ((LATENT_SCALE_NODE,) if self._latent_scale_needed else ())
         info = {name: server.client.node_info(name) for name in needed}
         absent = sorted(name for name, entry in info.items() if entry is None)
@@ -337,9 +378,9 @@ class WanTurboComfyUIBackend(VideoGenerationBackend):
 
         # The workflow's input names must match this ComfyUI version.
         probe = build_workflow(
-            models=config.models, image_name="x.png", prompt="x", negative_prompt="", width=1280, height=704,
+            models=models, image_name="x.png", prompt="x", negative_prompt="", width=1280, height=704,
             num_frames=MAX_FRAMES, seed=0, output_prefix="x",
-            settings={**DEFAULTS, "latent_scale": 0.5 if self._latent_scale_needed else 1.0},
+            settings={**self.defaults, "latent_scale": 0.5 if self._latent_scale_needed else 1.0},
         )
         for node in probe.values():
             inputs = info[node["class_type"]].get("input", {})
@@ -353,9 +394,9 @@ class WanTurboComfyUIBackend(VideoGenerationBackend):
                 )
         for kind, (node_class, input_name) in MODEL_INPUTS.items():
             listed = _choices(info[node_class]["input"]["required"].get(input_name))
-            if listed is not None and config.models[kind] not in listed:
+            if listed is not None and models[kind] not in listed:
                 raise BackendNotInstalledError(
-                    f"ComfyUI does not list {config.models[kind]!r} for {node_class}.{input_name}; "
+                    f"ComfyUI does not list {models[kind]!r} for {node_class}.{input_name}; "
                     "the running server may belong to a different install"
                 )
 
@@ -365,13 +406,15 @@ class WanTurboComfyUIBackend(VideoGenerationBackend):
         if self._server is None:
             raise RuntimeError("prepare() must be called before generate()")
         server, client, config = self._server, self._server.client, self._server.config
+        models = self._models(config)
         settings = self._settings(request)
+        guidance = settings["guidance_scale"]
         width, height = request.output_resolution.width, request.output_resolution.height
         num_frames = frame_count_for(request.duration_seconds)
         output_dir = Path(output_dir)
 
         warnings: list[str] = []
-        if request.negative_prompt:
+        if request.negative_prompt and guidance == 1.0:
             warnings.append("negative_prompt has no effect: this model runs at CFG 1")
         unused = [
             name for name in ("camera_motion", "subject_motion", "visual_direction")
@@ -407,7 +450,7 @@ class WanTurboComfyUIBackend(VideoGenerationBackend):
         output_prefix = f"{OUTPUT_PREFIX}/{run_key}"
         image_name = client.upload_image(Path(conditioning.derived_file), f"ai_studio_{run_key}.png")
         workflow = build_workflow(
-            models=config.models, image_name=image_name, prompt=request.prompt,
+            models=models, image_name=image_name, prompt=request.prompt,
             negative_prompt=request.negative_prompt or "", width=width, height=height,
             num_frames=num_frames, seed=request.seed, settings=settings, output_prefix=output_prefix,
         )
@@ -444,20 +487,20 @@ class WanTurboComfyUIBackend(VideoGenerationBackend):
             environment["ffmpeg_version"] = ffmpeg_version
         return GenerationResult(
             output_video=str(output),
-            backend_name=BACKEND_NAME,
+            backend_name=self.backend_name,
             backend_version=BACKEND_VERSION,
-            model_name=MODEL_NAME,
+            model_name=self.model_name,
             model_version=self._hashes["unet"],
             parameters={
                 **settings,
-                "cfg": CFG,
+                "cfg": guidance,
                 "num_frames": num_frames,
                 "width": width,
                 "height": height,
                 "fps": NATIVE_FPS,
-                "unet": config.models["unet"],
-                "text_encoder": config.models["text_encoder"],
-                "vae": config.models["vae"],
+                "unet": models["unet"],
+                "text_encoder": models["text_encoder"],
+                "vae": models["vae"],
                 "vae_decode": "VAEDecodeTiled",
                 "spatial_tile_overlap": SPATIAL_TILE_OVERLAP,
                 "temporal_tile": temporal_tile_for(num_frames),
@@ -470,7 +513,7 @@ class WanTurboComfyUIBackend(VideoGenerationBackend):
             fps=NATIVE_FPS,
             frame_count=len(images),
             inference_steps=settings["num_inference_steps"],
-            guidance=CFG,
+            guidance=guidance,
             start_frame_conditioning=conditioning,
         )
 
@@ -489,6 +532,33 @@ class WanTurboComfyUIBackend(VideoGenerationBackend):
                 uploaded.unlink()
         except OSError:
             pass
+
+
+class WanTurboComfyUIBackend(WanComfyUIBackend):
+    """The Turbo finetune (quanhaol), Q8_0 GGUF: 4 steps, CFG fixed at 1."""
+
+    backend_name = "wan-ti2v-5b-turbo-comfyui"
+    model_name = "Wan2.2-TI2V-5B-Turbo (quanhaol) GGUF Q8_0"
+    workflow_version = "i2v-turbo-tiled-v1"
+    unet_kind = "unet"
+    defaults = DEFAULTS
+    fixed_guidance = TURBO_GUIDANCE
+
+
+class WanBaseComfyUIBackend(WanComfyUIBackend):
+    """The base Wan 2.2 TI2V-5B, Q8_0 GGUF: 20 steps, CFG 5 by default."""
+
+    backend_name = "wan-ti2v-5b-comfyui"
+    model_name = "Wan2.2-TI2V-5B GGUF Q8_0"
+    workflow_version = "i2v-tiled-v1"
+    unet_kind = "unet_base"
+    defaults = BASE_DEFAULTS
+
+
+def _cuda_version(build: str) -> str | None:
+    """"cu128" -> "12.8" (the form of torch.version.cuda); None for "cpu"."""
+    digits = build[2:] if build.startswith("cu") else ""
+    return f"{digits[:-1]}.{digits[-1]}" if len(digits) >= 2 and digits.isdigit() else None
 
 
 def _rounded(value: float | None) -> float | None:

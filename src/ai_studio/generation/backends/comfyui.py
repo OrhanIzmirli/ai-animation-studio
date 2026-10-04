@@ -41,10 +41,15 @@ CONFIG_ENV_VAR = "AI_STUDIO_COMFYUI_CONFIG"
 DEFAULT_CONFIG_PATH = "configs/comfyui.local.yaml"
 EXAMPLE_CONFIG_PATH = "configs/comfyui.example.yaml"
 HOST = "127.0.0.1"  # the server is never exposed beyond this machine
-MODEL_KINDS = ("unet", "text_encoder", "vae")
+# `models` keys. text_encoder and vae are required; each backend needs its own
+# GGUF: "unet" (Turbo) or "unet_base" (base model).
+REQUIRED_MODEL_KINDS = ("text_encoder", "vae")
+UNET_KINDS = ("unet", "unet_base")
+MODEL_KINDS = UNET_KINDS + REQUIRED_MODEL_KINDS
 # Where ComfyUI looks for each kind of model file, relative to <comfyui_dir>/models.
 MODEL_FOLDERS = {
     "unet": ("diffusion_models", "unet"),
+    "unet_base": ("diffusion_models", "unet"),
     "text_encoder": ("text_encoders", "clip"),
     "vae": ("vae",),
 }
@@ -54,7 +59,7 @@ _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 @dataclass(frozen=True, kw_only=True)
 class ComfyUIConfig:
     comfyui_dir: Path
-    models: dict[str, str]  # kind -> file name, kinds: MODEL_KINDS
+    models: dict[str, str]  # kind -> file name, see MODEL_KINDS
     python: Path | None = None  # None: <comfyui_dir>/venv python
     port: int = 8188
     startup_timeout_seconds: float = 300.0
@@ -64,8 +69,14 @@ class ComfyUIConfig:
     extra_args: tuple[str, ...] = ()  # extra arguments for ComfyUI's main.py
 
     def __post_init__(self) -> None:
-        if not isinstance(self.models, dict) or set(self.models) != set(MODEL_KINDS):
-            raise ValueError(f"models must name exactly {MODEL_KINDS}")
+        if (
+            not isinstance(self.models, dict)
+            or not set(REQUIRED_MODEL_KINDS) <= set(self.models) <= set(MODEL_KINDS)
+            or not set(self.models) & set(UNET_KINDS)
+        ):
+            raise ValueError(
+                f"models must name {REQUIRED_MODEL_KINDS} and at least one of {UNET_KINDS}"
+            )
         for kind, name in self.models.items():
             if not isinstance(name, str) or not name or Path(name).name != name:
                 raise ValueError(f"models.{kind} must be a file name without a directory, got {name!r}")

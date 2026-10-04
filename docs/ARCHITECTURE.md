@@ -46,7 +46,8 @@ carry `task_type`.
 | Backend | Capability | State |
 |---|---|---|
 | `WanTI2V5BBackend` (`wan_ti2v.py`) | generation, image-to-video (start frame) | implemented; needs the `wan` extra and a CUDA GPU. See [BACKEND_WAN_TI2V_5B.md](BACKEND_WAN_TI2V_5B.md) |
-| `WanTurboComfyUIBackend` (`wan_turbo_comfyui.py`) | generation, image-to-video (start frame) | implemented; a different model (Turbo finetune, GGUF) run through a local ComfyUI that the adapter starts and stops. Works on an 8 GB GPU. See [BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md](BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md) |
+| `WanBaseComfyUIBackend` (`wan_comfyui.py`) | generation, image-to-video (start frame) | implemented; the base model as Q8_0 GGUF through the same local ComfyUI code as the Turbo backend, with its own identity |
+| `WanTurboComfyUIBackend` (`wan_comfyui.py`) | generation, image-to-video (start frame) | implemented; a different model (Turbo finetune, GGUF) run through a local ComfyUI that the adapter starts and stops. Works on an 8 GB GPU. See [BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md](BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md) |
 | `JoyAIVideoEditBackend` (`joyai.py`) | editing | placeholder, not installed |
 | `KiwiEditBackend` (`kiwi.py`) | editing | placeholder, not installed |
 | `WanEditCtrlBackend` (`wan_editctrl.py`) | editing | placeholder, not installed |

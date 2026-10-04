@@ -1,7 +1,8 @@
 # Backend: Wan 2.2 TI2V-5B Turbo (GGUF) through a local ComfyUI
 
-Adapter: [`src/ai_studio/generation/backends/wan_turbo_comfyui.py`](../src/ai_studio/generation/backends/wan_turbo_comfyui.py),
-class `WanTurboComfyUIBackend`. ComfyUI plumbing (config, HTTP client, server
+Adapter: [`src/ai_studio/generation/backends/wan_comfyui.py`](../src/ai_studio/generation/backends/wan_comfyui.py),
+class `WanTurboComfyUIBackend`. The same module also provides the base-model
+backend `wan-ti2v-5b-comfyui`; see [The base-model backend](#the-base-model-backend-wan-ti2v-5b-comfyui). ComfyUI plumbing (config, HTTP client, server
 lifecycle): [`comfyui.py`](../src/ai_studio/generation/backends/comfyui.py).
 Contract: `VideoGenerationBackend`, `supports_start_frame = True`.
 
@@ -102,8 +103,10 @@ adds no dependency to the project. About 26 GB of disk are needed.
 | `port` | 8188 | ComfyUI is started on, or reused from, `127.0.0.1:<port>` |
 | `startup_timeout_seconds` | 300 | |
 | `generation_timeout_seconds` | 3600 | a longer prompt is interrupted and recorded as a failed run |
-| `models.unet` / `text_encoder` / `vae` | required | file names under `<comfyui_dir>/models/` |
-| `sha256.unet` / `text_encoder` / `vae` | optional | expected hashes; a file that does not match is refused |
+| `models.text_encoder` / `vae` | required | file names under `<comfyui_dir>/models/` |
+| `models.unet` | needed by the Turbo backend | the Turbo GGUF |
+| `models.unet_base` | needed by the base backend | the base-model GGUF |
+| `sha256.unet` / `unet_base` / `text_encoder` / `vae` | optional | expected hashes; a file that does not match is refused |
 | `extra_args` | `[]` | extra arguments for ComfyUI's `main.py` |
 
 ## What is pinned and recorded
@@ -133,8 +136,12 @@ Every run record gets, in `environment`:
 | `comfyui_prompt_seconds`, `fetch_and_encode_seconds`, `model_hashing_seconds` | timing detail |
 | `comfyui_server_reused` | whether an already running ComfyUI was used |
 
-Note that the record's generic `pytorch_version` / `cuda_version` describe the
-Python that runs *this project*, not ComfyUI; use the `comfyui_torch_*` keys.
+The record's generic `pytorch_version` / `cuda_version` also name ComfyUI's
+torch (e.g. `2.11.0+cu128` / `12.8`), because that is the torch that ran the
+model. The torch of the Python that only drives the run is recorded
+separately as `orchestrator_pytorch_version`. The first adapter run
+(`20261004T210526Z-92e20c65`) predates this: its `pytorch_version` is the
+orchestrator's `2.13.0+cpu`; use its `comfyui_torch_version`.
 
 `model_parameters` holds every effective setting: steps, shift, sampler,
 scheduler, `cfg`, `spatial_tile`, `temporal_tile`, tile overlaps,
@@ -256,6 +263,31 @@ First run through the adapter and the CLI
 
 The identical file shows that this ComfyUI setup is reproducible for a fixed
 seed on this machine, and that the adapter reproduces the spike exactly.
+
+## The base-model backend: `wan-ti2v-5b-comfyui`
+
+`WanBaseComfyUIBackend` runs the **base** Wan 2.2 TI2V-5B as Q8_0 GGUF
+(`Wan2.2-TI2V-5B-Q8_0.gguf`, `QuantStack/Wan2.2-TI2V-5B-GGUF`, SHA-256
+`57bece983817ab2f957546683bb670f13be7d99022d45674840cd999a050ea8f`) with the
+same code: same workflow, lifecycle, start-frame preprocessing, tiled decode
+with the computed temporal tile, encoder and recorded provenance.
+
+| | Turbo backend | Base backend |
+|---|---|---|
+| `backend_name` | `wan-ti2v-5b-turbo-comfyui` | `wan-ti2v-5b-comfyui` |
+| `model_name` | `Wan2.2-TI2V-5B-Turbo (quanhaol) GGUF Q8_0` | `Wan2.2-TI2V-5B GGUF Q8_0` |
+| `model_version` | SHA-256 of the Turbo GGUF | SHA-256 of the base GGUF |
+| `workflow_version` | `i2v-turbo-tiled-v1` | `i2v-tiled-v1` |
+| Config key of its GGUF | `models.unet` | `models.unet_base` |
+| Steps | 4 | 20 |
+| CFG | 1, fixed | 5, parameter `guidance_scale` (≥ 1) |
+| Sampler / scheduler / shift | `uni_pc` / `simple` / 8 | `uni_pc` / `simple` / 8 |
+| Negative prompt | no effect (warning) | used |
+
+The base defaults are those of ComfyUI's own template for this model. It is
+also distinct from the diffusers backend `wan-ti2v-5b`, which runs the
+unquantised weights. Measured cost on this laptop: see
+[experiments/E1_REPORT.md](experiments/E1_REPORT.md).
 
 ## Known limits
 

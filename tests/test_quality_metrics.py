@@ -336,7 +336,7 @@ def test_undecodable_or_missing_files_are_reported(tmp_path):
 
 # --- store ---
 
-def log_run(project, run_id, *, status="success", output_video="default", start_frame=None, steps=50):
+def log_run(project, run_id, *, status="success", output_video="default", start_frame=None, steps=50, purpose=None):
     logger = BenchmarkLogger(project / "benchmarks" / "results")
     if output_video == "default":
         output_video = f"outputs/{BENCH}/{run_id}/out.mp4" if status == "success" else None
@@ -345,6 +345,7 @@ def log_run(project, run_id, *, status="success", output_video="default", start_
     }
     logger.log(BenchmarkResult(
         benchmark_id=BENCH, run_id=run_id, task_type="video_generation", **failure,
+        task_parameters={} if purpose is None else {"run_purpose": purpose},
         model="m", model_version="1", workflow_version="w", seed=1, inference_steps=steps, guidance=5.0,
         prompt="p", output_video=output_video, start_frame=start_frame,
         resolution=Resolution(width=1280, height=704),
@@ -482,7 +483,7 @@ def load_measure_script():
 def test_measure_run_script(project, monkeypatch):
     script = load_measure_script()
     monkeypatch.setenv(paths.ROOT_ENV_VAR, str(project))
-    log_run(project, "20261001T000000Z-aaaaaaaa", steps=2)
+    log_run(project, "20261001T000000Z-aaaaaaaa", steps=2, purpose="smoke")
     log_run(project, "20261002T000000Z-bbbbbbbb", status="failed")
     log_run(project, "20261003T000000Z-cccccccc", steps=50)  # its video is not on this machine
     video = write_video(project / "outputs" / BENCH / "20261001T000000Z-aaaaaaaa" / "out.mp4", pulsing_frames())
@@ -493,11 +494,13 @@ def test_measure_run_script(project, monkeypatch):
 
     code, lines = run(measure_all=True)
     assert code == 1  # one selected run could not be measured
-    assert lines[1].split() == ["run", "steps", "motion_mean", "total_change", "start_psnr",
+    assert lines[1].split() == ["run", "purpose", "steps", "motion_mean", "total_change", "start_psnr",
                                 "pulse_ratio", "flicker", "held_ratio", "note"]
     measured, failed, absent = lines[2], lines[3], lines[4]
-    assert measured.split()[:2] == ["20261001T000000Z-aaaaaaaa", "2"] and "measured (no start frame)" in measured
-    assert float(measured.split()[5]) > 2  # pulse ratio column
+    assert measured.split()[:3] == ["20261001T000000Z-aaaaaaaa", "smoke", "2"]
+    assert "measured (no start frame)" in measured
+    assert float(measured.split()[6]) > 2  # pulse ratio column
+    assert failed.split()[1] == "-"  # a record written before purposes existed
     assert "skipped: failed run" in failed
     assert "skipped: video not on this machine" in absent
     metrics_root = project / "benchmarks" / "metrics" / BENCH

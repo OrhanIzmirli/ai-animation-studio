@@ -1,4 +1,5 @@
-# Local ComfyUI installation used by the "wan-ti2v-5b-turbo-comfyui" backend.
+# Local ComfyUI installation used by the "wan-ti2v-5b-turbo-comfyui" and
+# "wan-ti2v-5b-comfyui" backends.
 #
 # Copy this file to configs/comfyui.local.yaml (git-ignored) and adjust
 # comfyui_dir. Alternatively point $AI_STUDIO_COMFYUI_CONFIG at a config file.
@@ -20,8 +21,11 @@ generation_timeout_seconds: 3600
 
 # File names inside <comfyui_dir>/models/ (diffusion_models or unet,
 # text_encoders or clip, vae).
+# unet is the Turbo GGUF, unet_base the base-model GGUF; a backend only needs
+# its own, so either line may be removed.
 models:
   unet: Wan2_2-TI2V-5B-Turbo-Q8_0.gguf
+  unet_base: Wan2.2-TI2V-5B-Q8_0.gguf
   text_encoder: umt5_xxl_fp8_e4m3fn_scaled.safetensors
   vae: wan2.2_vae.safetensors
 
@@ -31,6 +35,7 @@ models:
 # is still recorded with the run).
 sha256:
   unet: b4d7d1888d5ec2c29046cc443239faad99614cd3d356c61d8192fcac5f4c98fc
+  unet_base: 57bece983817ab2f957546683bb670f13be7d99022d45674840cd999a050ea8f
   text_encoder: c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68
   vae: e40321bd36b9709991dae2530eb4ac303dd168276980d3e9bc4b6e2b75fed156
 

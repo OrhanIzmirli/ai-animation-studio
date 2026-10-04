@@ -23,11 +23,12 @@ import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 UNET = "Wan2_2-TI2V-5B-Turbo-Q8_0.gguf"
+BASE_UNET = "Wan2.2-TI2V-5B-Q8_0.gguf"
 TEXT_ENCODER = "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
 VAE = "wan2.2_vae.safetensors"
 
 NODES = {
-    "UnetLoaderGGUF": {"required": {"unet_name": [[UNET, "other.gguf"]]}},
+    "UnetLoaderGGUF": {"required": {"unet_name": [[UNET, BASE_UNET]]}},
     "CLIPLoader": {
         "required": {"clip_name": [[TEXT_ENCODER]], "type": [["stable_diffusion", "wan"]]},
         "optional": {"device": [["default", "cpu"], {"advanced": True}]},

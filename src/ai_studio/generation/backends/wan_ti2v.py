@@ -357,6 +357,9 @@ class WanTI2V5BBackend(VideoGenerationBackend):
         self._resolved_revision = snapshot.name  # snapshots/<commit sha>
         self._make_generator = lambda seed: torch.Generator(device="cuda").manual_seed(seed)
         self._environment = {
+            # generic keys: the torch that ran the model (here: this process's own)
+            "pytorch_version": torch.__version__,
+            "cuda_version": torch.version.cuda,
             "torch_version": torch.__version__,
             "diffusers_version": diffusers.__version__,
             "transformers_version": transformers.__version__,

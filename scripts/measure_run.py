@@ -26,7 +26,7 @@ from ai_studio.quality.metrics import METRICS_VERSION  # noqa: E402
 from ai_studio.quality.store import VideoMetricsStore  # noqa: E402
 
 COLUMNS = (
-    ("run", "{}"), ("steps", "{}"), ("motion_mean", "{:.3f}"), ("total_change", "{:.3f}"),
+    ("run", "{}"), ("purpose", "{}"), ("steps", "{}"), ("motion_mean", "{:.3f}"), ("total_change", "{:.3f}"),
     ("start_psnr", "{:.2f}"), ("pulse_ratio", "{:.2f}"), ("flicker", "{:.3f}"), ("held_ratio", "{:.3f}"),
     ("note", "{}"),
 )
@@ -35,7 +35,7 @@ COLUMNS = (
 def table_row(run, record, note: str) -> list[str]:
     metrics = record.metrics if record else {}
     values = [
-        run.run_id, run.inference_steps, metrics.get("motion_mean"), metrics.get("total_change"),
+        run.run_id, run.task_parameters.get("run_purpose"), run.inference_steps, metrics.get("motion_mean"), metrics.get("total_change"),
         metrics.get("start_frame_psnr"), metrics.get("temporal_pulse_ratio"),
         metrics.get("luminance_flicker"), metrics.get("held_frame_ratio"), note,
     ]

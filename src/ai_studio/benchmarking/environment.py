@@ -7,10 +7,25 @@ env_vars holds a small allowlist of process environment variables that change
 how a run behaves (allocator settings, visible devices, offline mode), each
 None when unset. Nothing else from the process environment is recorded.
 
-Two different CUDA versions are recorded on purpose:
+Whose PyTorch? The process that runs a benchmark (the "orchestrator") is not
+always the process that runs the model: a backend may drive an external
+program with its own Python. So this module records only what it can know:
+  orchestrator_pytorch_version / orchestrator_cuda_version
+                         the torch importable in THIS process, if any
+  pytorch_version / cuda_version
+                         the torch that actually ran the model. Left None
+                         here; the backend reports them in its result.
   reported_cuda_version  highest CUDA version the NVIDIA DRIVER supports
                          (from the nvidia-smi header; no PyTorch needed)
-  cuda_version           CUDA runtime PyTorch was BUILT with (torch.version.cuda)
+Records written before this split have the orchestrator's torch in
+pytorch_version / cuda_version and no orchestrator_* keys.
+
+git_dirty answers "does the commit hash reproduce the CODE of this run?".
+Changes that are only under the data paths (run records, metrics,
+evaluations, outputs) do not make it true: every recorded run adds such
+files. Nothing is hidden: git_status keeps the raw `git status --porcelain`
+lines, and git_untracked_data_only says whether data paths were the only
+changes.
 """
 
 from __future__ import annotations
@@ -31,6 +46,8 @@ ENVIRONMENT_KEYS = (
     "python_version",
     "git_commit",
     "git_dirty",
+    "git_untracked_data_only",
+    "git_status",
     "gpu_model",
     "gpu_count",
     "vram_gb",
@@ -38,8 +55,20 @@ ENVIRONMENT_KEYS = (
     "reported_cuda_version",
     "cuda_version",
     "pytorch_version",
+    "orchestrator_cuda_version",
+    "orchestrator_pytorch_version",
     "env_vars",
 )
+
+# Paths that hold run data, not code. Changes only here do not make a run "dirty".
+DATA_PATH_PREFIXES = (
+    "benchmarks/results/",
+    "benchmarks/metrics/",
+    "benchmarks/evaluations/",
+    "benchmarks/comic_evaluations/",
+    "outputs/",
+)
+MAX_GIT_STATUS_LINES = 200
 
 # Process environment variables worth recording. Keep it short: no paths, no secrets.
 RECORDED_ENV_VARS = ("PYTORCH_CUDA_ALLOC_CONF", "CUDA_VISIBLE_DEVICES", "HF_HUB_OFFLINE")
@@ -61,8 +90,10 @@ def collect_environment(repo_dir: str | Path | None = None) -> dict[str, Any]:
     env["driver_version"] = smi.get("driver_version")
     env["reported_cuda_version"] = smi.get("reported_cuda_version")
     env["gpu_count"] = smi.get("gpu_count") or torch.get("gpu_count")
-    env["pytorch_version"] = torch.get("pytorch_version")
-    env["cuda_version"] = torch.get("cuda_version")
+    # pytorch_version / cuda_version stay None: only the backend knows which
+    # torch ran the model (see the module docstring).
+    env["orchestrator_pytorch_version"] = torch.get("pytorch_version")
+    env["orchestrator_cuda_version"] = torch.get("cuda_version")
     env["gpu_model"] = torch.get("gpu_model") or smi.get("gpu_model")
     env["vram_gb"] = torch.get("vram_gb") or smi.get("vram_gb")
     env["env_vars"] = {name: os.environ.get(name) for name in RECORDED_ENV_VARS}
@@ -83,7 +114,7 @@ def _run(args: list[str], cwd: Path | None = None) -> str | None:
         )
     except (OSError, subprocess.SubprocessError):
         return None
-    return out.stdout.strip()
+    return out.stdout.strip("\n") if args[:2] == ["git", "status"] else out.stdout.strip()
 
 
 def _git_info(repo_dir: Path | None) -> dict[str, Any]:
@@ -92,9 +123,40 @@ def _git_info(repo_dir: Path | None) -> dict[str, Any]:
     commit = _run(["git", "rev-parse", "HEAD"], cwd=repo_dir)
     if not commit:
         return {}
-    status = _run(["git", "status", "--porcelain"], cwd=repo_dir)
-    # Uncommitted changes mean the commit hash alone does not reproduce the run.
-    return {"git_commit": commit, "git_dirty": bool(status) if status is not None else None}
+    # --untracked-files=all: list every file, so a new folder that holds only
+    # data is not reported as one opaque "?? folder/" line.
+    status = _run(["git", "status", "--porcelain", "--untracked-files=all"], cwd=repo_dir)
+    if status is None:
+        return {"git_commit": commit, "git_dirty": None, "git_untracked_data_only": None, "git_status": None}
+    return {"git_commit": commit, **classify_git_status(status)}
+
+
+def _porcelain_paths(line: str) -> list[str]:
+    """Paths named by one `git status --porcelain` line ("XY path" or
+    "XY old -> new"), without git's quoting."""
+    return [part.strip().strip('"') for part in line[3:].split(" -> ")]
+
+
+def classify_git_status(porcelain: str) -> dict[str, Any]:
+    """git_dirty / git_untracked_data_only / git_status from porcelain output.
+
+    git_dirty                True if anything outside DATA_PATH_PREFIXES is
+                             modified, staged or untracked: the commit hash
+                             alone does not reproduce the code of the run.
+    git_untracked_data_only  True if there are changes and all of them are
+                             under the data paths (so git_dirty is False).
+    git_status               the raw lines (at most MAX_GIT_STATUS_LINES).
+    """
+    lines = [line for line in porcelain.splitlines() if line.strip()]
+    code_changes = [
+        line for line in lines
+        if not all(path.startswith(DATA_PATH_PREFIXES) for path in _porcelain_paths(line))
+    ]
+    return {
+        "git_dirty": bool(code_changes),
+        "git_untracked_data_only": bool(lines) and not code_changes,
+        "git_status": lines[:MAX_GIT_STATUS_LINES],
+    }
 
 
 def _nvidia_smi_info() -> dict[str, Any]:

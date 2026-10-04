@@ -1,5 +1,5 @@
-"""The local ComfyUI backend for Wan 2.2 TI2V-5B Turbo. No ComfyUI, GPU or
-model needed: a fake ComfyUI HTTP server stands in (tests/fake_comfyui.py)."""
+"""The local ComfyUI backends for Wan 2.2 TI2V-5B (Turbo and base GGUF). No
+ComfyUI, GPU or model needed: a fake ComfyUI HTTP server stands in (tests/fake_comfyui.py)."""
 
 import hashlib
 import json
@@ -17,19 +17,20 @@ from ai_studio.generation.backends import (
     BACKENDS,
     BackendNotInstalledError,
     VideoGenerationBackend,
+    WanBaseComfyUIBackend,
     WanTI2V5BBackend,
     WanTurboComfyUIBackend,
 )
 from ai_studio.generation.backends import comfyui as comfyui_module
 from ai_studio.generation.backends import registry
-from ai_studio.generation.backends import wan_turbo_comfyui as turbo
+from ai_studio.generation.backends import wan_comfyui as turbo
 from ai_studio.generation.backends.comfyui import ComfyUIConfig, ComfyUIServer, load_config
-from ai_studio.generation.backends.wan_turbo_comfyui import build_workflow, temporal_tile_for
+from ai_studio.generation.backends.wan_comfyui import build_workflow, temporal_tile_for
 from ai_studio.generation.capabilities import Capability
 from ai_studio.generation.request import VideoGenerationRequest
 from ai_studio.system_memory import LowestAvailableRam, available_ram_gb, total_ram_gb
 from conftest import FAKE_ENVIRONMENT
-from fake_comfyui import TEXT_ENCODER, UNET, VAE, FakeComfyUI
+from fake_comfyui import BASE_UNET, TEXT_ENCODER, UNET, VAE, FakeComfyUI
 
 np = pytest.importorskip("numpy")
 Image = pytest.importorskip("PIL.Image")
@@ -40,6 +41,10 @@ FRAME = "benchmarks/references/comic_hero_01/rooftop_frame.png"
 MODELS = {"unet": UNET, "text_encoder": TEXT_ENCODER, "vae": VAE}
 MODEL_BYTES = {"unet": b"fake turbo gguf", "text_encoder": b"fake umt5", "vae": b"fake vae"}
 MODEL_SHA = {kind: hashlib.sha256(data).hexdigest() for kind, data in MODEL_BYTES.items()}
+BASE_BYTES = b"fake base gguf"
+BASE_SHA = hashlib.sha256(BASE_BYTES).hexdigest()
+BOTH_MODELS = {**MODELS, "unet_base": BASE_UNET}
+BOTH_SHA = {**MODEL_SHA, "unet_base": BASE_SHA}
 
 needs_ffmpeg = pytest.mark.skipif(
     shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
@@ -61,6 +66,7 @@ def comfy_dir(tmp_path):
     for kind, folder in (("unet", "diffusion_models"), ("text_encoder", "text_encoders"), ("vae", "vae")):
         (root / "models" / folder).mkdir(parents=True)
         (root / "models" / folder / MODELS[kind]).write_bytes(MODEL_BYTES[kind])
+    (root / "models" / "diffusion_models" / BASE_UNET).write_bytes(BASE_BYTES)
     shutil.copy(Path(__file__).parent / "fake_comfyui.py", root / "main.py")
     return root
 
@@ -118,7 +124,7 @@ def test_module_needs_no_heavy_dependency():
 
     code = (
         "import sys\n"
-        "import ai_studio.generation.backends.wan_turbo_comfyui\n"
+        "import ai_studio.generation.backends.wan_comfyui\n"
         "bad = [m for m in ('torch', 'PIL', 'numpy', 'psutil') if m in sys.modules]\n"
         "assert not bad, bad\n"
     )
@@ -233,8 +239,9 @@ def test_invalid_requests_rejected(overrides, match):
 def test_example_config_is_valid_and_has_no_personal_path(monkeypatch):
     example = REPO_ROOT / "configs" / "comfyui.example.yaml"
     config = load_config(example)
-    assert config.models == MODELS and config.port == 8188
-    assert set(config.sha256) == {"unet", "text_encoder", "vae"}
+    assert config.models == BOTH_MODELS and config.port == 8188
+    assert set(config.sha256) == {"unet", "unet_base", "text_encoder", "vae"}
+    assert config.sha256["unet_base"] == "57bece983817ab2f957546683bb670f13be7d99022d45674840cd999a050ea8f"
     assert config.sha256["unet"] == "b4d7d1888d5ec2c29046cc443239faad99614cd3d356c61d8192fcac5f4c98fc"
     assert "rhn23" not in example.read_text(encoding="utf-8")
     assert config.python_executable.parent.name in ("Scripts", "bin")
@@ -262,7 +269,9 @@ def test_config_is_found_through_the_environment_variable(monkeypatch, tmp_path,
         (None, "not configured"),
         ("- a list\n", "expected a mapping"),
         ("port: 8188\n", "comfyui_dir is required"),
-        ("comfyui_dir: x\nmodels: {unet: a.gguf}\n", "models must name exactly"),
+        ("comfyui_dir: x\nmodels: {unet: a.gguf}\n", "models must name"),
+        ("comfyui_dir: x\nmodels: {text_encoder: t, vae: v}\n", "at least one of"),
+        ("comfyui_dir: x\nmodels: {unet: a, text_encoder: t, vae: v, lora: l}\n", "models must name"),
         ("comfyui_dir: x\nmodels: {unet: sub/a.gguf, text_encoder: t, vae: v}\n", "file name without a directory"),
         ("comfyui_dir: x\nmodels: {unet: a, text_encoder: t, vae: v}\nport: 0\n", "port"),
         ("comfyui_dir: x\nmodels: {unet: a, text_encoder: t, vae: v}\nsha256: {unet: abc}\n", "sha256"),
@@ -275,6 +284,88 @@ def test_missing_or_invalid_config_is_a_setup_problem(tmp_path, text, match):
         path.write_text(text, encoding="utf-8")
     with pytest.raises(BackendNotInstalledError, match=match):
         load_config(path)
+
+
+# --- the base-model backend: same code, its own identity ---
+
+def base_config(comfy_dir, port, **overrides):
+    return make_config(comfy_dir, port, models=dict(BOTH_MODELS), sha256=dict(BOTH_SHA), **overrides)
+
+
+def test_base_backend_identity_and_defaults(comfy_dir):
+    assert BACKENDS["wan-ti2v-5b-comfyui"] is WanBaseComfyUIBackend
+    assert issubclass(WanBaseComfyUIBackend, turbo.WanComfyUIBackend)
+    assert issubclass(WanTurboComfyUIBackend, turbo.WanComfyUIBackend)
+    assert WanBaseComfyUIBackend.supports_start_frame is True
+
+    config = base_config(comfy_dir, 1)
+    base, fast = WanBaseComfyUIBackend(config).metadata(), WanTurboComfyUIBackend(config).metadata()
+    assert base.backend_name == "wan-ti2v-5b-comfyui"
+    assert base.model_name == "Wan2.2-TI2V-5B GGUF Q8_0" and "Turbo" not in base.model_name
+    assert base.model_version == BASE_SHA and fast.model_version == MODEL_SHA["unet"]
+    assert base.workflow_version == "i2v-tiled-v1" != fast.workflow_version
+    assert base.backend_name != WanTI2V5BBackend().metadata().backend_name  # nor the diffusers adapter
+
+    assert WanBaseComfyUIBackend.defaults == {
+        "num_inference_steps": 20, "shift": 8.0, "sampler": "uni_pc", "scheduler": "simple",
+        "spatial_tile": 512, "latent_scale": 1.0, "guidance_scale": 5.0,
+    }
+    assert WanBaseComfyUIBackend.fixed_guidance is None and WanTurboComfyUIBackend.fixed_guidance == 1.0
+
+
+def test_guidance_is_a_parameter_for_base_only(comfy_dir):
+    config = base_config(comfy_dir, 1)
+    WanBaseComfyUIBackend(config).validate_inputs(make_request(backend_parameters={"guidance_scale": 3.5}))
+    with pytest.raises(ValueError, match="guidance_scale must be a number >= 1"):
+        WanBaseComfyUIBackend(config).validate_inputs(make_request(backend_parameters={"guidance_scale": 0.5}))
+    with pytest.raises(ValueError, match="unknown backend_parameters \\['guidance_scale'\\]"):
+        WanTurboComfyUIBackend(config).validate_inputs(make_request(backend_parameters={"guidance_scale": 3.5}))
+    for backend_class in (WanBaseComfyUIBackend, WanTurboComfyUIBackend):  # never a free setting, for either
+        with pytest.raises(ValueError, match="unknown backend_parameters"):
+            backend_class(config).validate_inputs(make_request(backend_parameters={"temporal_tile": 64}))
+
+
+def test_base_backend_needs_its_own_gguf_in_the_config(comfy_dir, fake):
+    with pytest.raises(BackendNotInstalledError, match="no models.unet_base entry"):
+        WanBaseComfyUIBackend(make_config(comfy_dir, fake.port)).prepare()  # Turbo-only config
+    (comfy_dir / "models" / "diffusion_models" / BASE_UNET).write_bytes(b"not the base model")
+    with pytest.raises(BackendNotInstalledError, match="not the expected unet file"):
+        WanBaseComfyUIBackend(base_config(comfy_dir, fake.port)).prepare()
+
+
+def test_turbo_does_not_need_the_base_gguf(comfy_dir, fake):
+    (comfy_dir / "models" / "diffusion_models" / BASE_UNET).unlink()
+    with WanTurboComfyUIBackend(base_config(comfy_dir, fake.port)) as backend:
+        backend.prepare()
+        assert backend._environment["model_sha256"] == MODEL_SHA
+
+
+@needs_ffmpeg
+def test_base_backend_end_to_end(project, rooftop, comfy_dir, fake):
+    definition, _ = rooftop
+    with WanBaseComfyUIBackend(base_config(comfy_dir, fake.port)) as backend:
+        record = make_runner(project).run_definition(
+            definition, backend, seed=42, output_resolution=LANDSCAPE, run_id="base-1", purpose="experiment",
+        )
+    assert record.status == "success"
+    assert record.backend == "wan-ti2v-5b-comfyui" and record.model == "Wan2.2-TI2V-5B GGUF Q8_0"
+    assert record.model_version == BASE_SHA and record.workflow_version == "i2v-tiled-v1"
+    assert record.inference_steps == 20 and record.guidance == 5.0
+    assert record.frame_count == 121 and record.fps == 24
+    assert record.task_parameters["run_purpose"] == "experiment"
+    assert record.model_parameters["unet"] == BASE_UNET
+    assert record.model_parameters["temporal_tile"] == 128  # same computed tiled decode
+    assert record.environment["model_sha256"] == {"unet": BASE_SHA, "text_encoder": MODEL_SHA["text_encoder"], "vae": MODEL_SHA["vae"]}
+    assert "negative_prompt has no effect" not in record.notes  # CFG 5: it does have an effect
+
+    (queued,) = fake.prompts.values()
+    by_class = {node["class_type"]: node["inputs"] for node in queued.values()}
+    assert by_class["UnetLoaderGGUF"] == {"unet_name": BASE_UNET}
+    sampler = by_class["KSampler"]
+    assert (sampler["steps"], sampler["cfg"], sampler["sampler_name"], sampler["scheduler"]) == (20, 5.0, "uni_pc", "simple")
+    assert by_class["ModelSamplingSD3"]["shift"] == 8.0
+    assert by_class["VAEDecodeTiled"]["temporal_size"] == 128
+    assert queued["6"]["inputs"]["text"] == definition.negative_prompt
 
 
 # --- prepare(): not installed ---
@@ -491,6 +582,8 @@ def test_end_to_end_success_record(project, rooftop, comfy_dir, fake):
     assert environment["model_sha256"] == MODEL_SHA
     assert environment["comfyui_torch_version"] == "2.11.0+cu128"
     assert environment["comfyui_torch_cuda_build"] == "cu128"
+    # the generic columns name the torch that ran the model: ComfyUI's
+    assert environment["pytorch_version"] == "2.11.0+cu128" and environment["cuda_version"] == "12.8"
     assert "comfyui_commit" in environment and "comfyui_gguf_commit" in environment
     assert environment["ram_available_before_gb"] > 0
     assert 0 < environment["ram_available_min_gb"] <= environment["ram_total_gb"]

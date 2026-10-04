@@ -13,7 +13,7 @@ from ai_studio.generation.backends.kiwi import KiwiEditBackend
 from ai_studio.generation.backends.registry import BACKENDS, get_backend
 from ai_studio.generation.backends.wan_editctrl import WanEditCtrlBackend
 from ai_studio.generation.backends.wan_ti2v import WanTI2V5BBackend
-from ai_studio.generation.backends.wan_turbo_comfyui import WanTurboComfyUIBackend
+from ai_studio.generation.backends.wan_comfyui import WanBaseComfyUIBackend, WanTurboComfyUIBackend
 
 __all__ = [
     "BACKENDS",
@@ -26,6 +26,7 @@ __all__ = [
     "VideoEditingBackend",
     "VideoGenerationBackend",
     "WanEditCtrlBackend",
+    "WanBaseComfyUIBackend",
     "WanTI2V5BBackend",
     "WanTurboComfyUIBackend",
     "get_backend",
