@@ -21,6 +21,7 @@ Model facts the adapter relies on:
 from __future__ import annotations
 
 import math
+import os
 import shutil
 import subprocess
 from collections.abc import Callable, Sequence
@@ -36,12 +37,16 @@ from ai_studio.generation.request import VideoGenerationRequest
 from ai_studio.generation.result import GenerationResult, StartFrameConditioning
 
 MODEL_REPO = "Wan-AI/Wan2.2-TI2V-5B-Diffusers"
+# Default pinned commit of MODEL_REPO (34.20 GB, 29 files).
+WAN_TI2V_5B_REVISION = "b8fff7315c768468a5333511427288870b2e9635"
 NATIVE_FPS = 24
 NATIVE_RESOLUTIONS = ((1280, 704), (704, 1280))  # (width, height)
 MAX_FRAMES = 121  # longer clips are not verified
 DEFAULT_INFERENCE_STEPS = 50
 DEFAULT_GUIDANCE_SCALE = 5.0
-ALLOWED_BACKEND_PARAMETERS = ("num_inference_steps", "guidance_scale", "revision", "cpu_offload")
+ALLOWED_BACKEND_PARAMETERS = (
+    "num_inference_steps", "guidance_scale", "revision", "cpu_offload", "vae_tiling",
+)
 ENCODER_SETTINGS = {
     "codec": "libx264", "pix_fmt": "yuv420p", "crf": 12, "preset": "slow",
     "fps": NATIVE_FPS, "audio": False,
@@ -165,6 +170,11 @@ def encode_frames(frames: Sequence[Any], output: str | Path, fps: int = NATIVE_F
     return settings
 
 
+def hf_hub_offline() -> bool:
+    """True when HF_HUB_OFFLINE asks for the local cache only."""
+    return os.environ.get("HF_HUB_OFFLINE", "").strip().upper() in ("1", "ON", "YES", "TRUE")
+
+
 def _ffmpeg_version() -> str | None:
     ffmpeg = shutil.which("ffmpeg")
     if ffmpeg is None:
@@ -187,11 +197,12 @@ class WanTI2V5BBackend(VideoGenerationBackend):
     def __init__(
         self,
         *,
-        revision: str | None = None,
+        revision: str | None = WAN_TI2V_5B_REVISION,
         pipeline_factory: Callable[[], Any] | None = None,
     ) -> None:
         """`revision` pins the Hugging Face revision (commit sha, tag or
-        branch); backend_parameters["revision"] does the same per request.
+        branch; default: WAN_TI2V_5B_REVISION; None: unpinned);
+        backend_parameters["revision"] does the same per request.
         `pipeline_factory` is for tests: it returns a callable taking the
         pipeline keyword arguments and returning an object with .frames[0];
         when given, prepare() imports neither torch nor diffusers."""
@@ -200,8 +211,10 @@ class WanTI2V5BBackend(VideoGenerationBackend):
         self._revision = revision
         self._pipeline_factory = pipeline_factory
         self._cpu_offload = False
+        self._vae_tiling = False
         self._pipe: Any = None
-        self._loaded: tuple[str | None, bool] | None = None  # (revision, cpu_offload) of _pipe
+        # (revision, cpu_offload, vae_tiling) that _pipe was loaded with
+        self._loaded: tuple[str | None, bool, bool] | None = None
         self._resolved_revision: str | None = None  # commit sha of the loaded weights
         self._make_generator: Callable[[int], Any] = lambda seed: None
         self._environment: dict[str, Any] = {}
@@ -241,6 +254,7 @@ class WanTI2V5BBackend(VideoGenerationBackend):
         settings = self._settings(request)
         # prepare() takes no request, so remember what it needs to load.
         self._revision, self._cpu_offload = settings["revision"], settings["cpu_offload"]
+        self._vae_tiling = settings["vae_tiling"]
 
     def _settings(self, request: VideoGenerationRequest) -> dict[str, Any]:
         """Effective backend parameters: requested values over the defaults."""
@@ -262,20 +276,25 @@ class WanTI2V5BBackend(VideoGenerationBackend):
         cpu_offload = parameters.get("cpu_offload", False)
         if not isinstance(cpu_offload, bool):
             raise ValueError("cpu_offload must be a bool")
+        vae_tiling = parameters.get("vae_tiling", False)
+        if not isinstance(vae_tiling, bool):
+            raise ValueError("vae_tiling must be a bool")
         return {
             "num_inference_steps": steps, "guidance_scale": float(guidance),
-            "revision": revision, "cpu_offload": cpu_offload,
+            "revision": revision, "cpu_offload": cpu_offload, "vae_tiling": vae_tiling,
         }
 
     # --- model loading ---
 
     def prepare(self) -> None:
-        wanted = (self._revision, self._cpu_offload)
+        wanted = (self._revision, self._cpu_offload, self._vae_tiling)
         if self._pipe is not None and self._loaded == wanted:
             return
         if self._pipeline_factory is not None:
-            self._pipe = self._pipeline_factory()
-            self._loaded = wanted
+            pipe = self._pipeline_factory()
+            if self._vae_tiling:
+                pipe.vae.enable_tiling()
+            self._pipe, self._loaded = pipe, wanted
             return
         try:
             import diffusers
@@ -293,8 +312,19 @@ class WanTI2V5BBackend(VideoGenerationBackend):
                 "and torch.cuda.is_available() is False"
             )
 
-        # Resolve the revision to the commit actually on disk, then load from that snapshot.
-        snapshot = Path(snapshot_download(MODEL_REPO, revision=self._revision))
+        # Resolve the revision to the commit actually on disk, then load from that
+        # snapshot. With HF_HUB_OFFLINE=1 only the local cache is used: no network.
+        try:
+            snapshot = Path(snapshot_download(
+                MODEL_REPO, revision=self._revision, local_files_only=hf_hub_offline(),
+            ))
+        except Exception as exc:
+            if not hf_hub_offline():
+                raise
+            raise RuntimeError(
+                f"HF_HUB_OFFLINE is set and {MODEL_REPO} at revision {self._revision!r} is not "
+                f"complete in the local Hugging Face cache (HF_HOME={os.environ.get('HF_HOME')!r}): {exc}"
+            ) from exc
         vae = AutoencoderKLWan.from_pretrained(snapshot, subfolder="vae", torch_dtype=torch.float32)
         pipe = WanImageToVideoPipeline.from_pretrained(snapshot, vae=vae, torch_dtype=torch.bfloat16)
         if getattr(pipe.config, "expand_timesteps", None) is not True:
@@ -302,6 +332,8 @@ class WanTI2V5BBackend(VideoGenerationBackend):
                 f"wrong weights: {MODEL_REPO} at {snapshot.name} does not have expand_timesteps=True "
                 "(not a TI2V checkpoint)"
             )
+        if self._vae_tiling:
+            pipe.vae.enable_tiling()
         if self._cpu_offload:
             pipe.enable_model_cpu_offload()
         else:
@@ -382,6 +414,7 @@ class WanTI2V5BBackend(VideoGenerationBackend):
                 "height": height,
                 "fps": NATIVE_FPS,
                 "cpu_offload": settings["cpu_offload"],
+                "vae_tiling": settings["vae_tiling"],
                 "torch_dtype": "bfloat16",
                 "vae_dtype": "float32",
                 "encoder": encoder,

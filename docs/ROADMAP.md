@@ -18,7 +18,10 @@ quality config, tests, documentation. No AI models.
   enforces pinned fps and duration instead of trusting backend-reported
   values. First real generation adapter: Wan 2.2 TI2V-5B, image-to-video
   ([BACKEND_WAN_TI2V_5B.md](BACKEND_WAN_TI2V_5B.md)), tested with an injected
-  pipeline. Next: its first run on a GPU; no baseline results exist yet.
+  pipeline. Command-line launcher (`scripts/run_benchmark.py`) and a
+  workflow for the free Camber L4 GPU node
+  ([RUNNING_ON_CAMBER.md](RUNNING_ON_CAMBER.md)). Next: the first run on a
+  GPU; no baseline results exist yet.
 
 See [PHASE_1_BENCHMARK.md](PHASE_1_BENCHMARK.md).
 

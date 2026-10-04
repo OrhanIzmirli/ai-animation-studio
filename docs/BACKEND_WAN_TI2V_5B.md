@@ -14,7 +14,7 @@ class `WanTI2V5BBackend`. Contract: `VideoGenerationBackend`,
 | `backend_name` | `wan-ti2v-5b` |
 | `backend_version` | `upstream-diffusers-0.1` |
 | `model_name` | `Wan2.2-TI2V-5B` |
-| `model_version` | resolved Hugging Face commit sha (or the requested revision, or `unpinned`) |
+| `model_version` | resolved Hugging Face commit sha; before loading, the pinned revision (default `b8fff7315c768468a5333511427288870b2e9635`) |
 | `workflow_version` | `i2v-v1` |
 | Weights | Hugging Face `Wan-AI/Wan2.2-TI2V-5B-Diffusers`, Apache-2.0 |
 
@@ -44,7 +44,8 @@ The `wan` extra is `torch`, `diffusers>=0.35`, `transformers`, `accelerate`,
 benchmark runs: 0.35 is the release line that added Wan 2.2, and the adapter
 was written against it. Newer releases are allowed by the extra but have not
 been checked. The diffusers version actually used is recorded in every run's
-`environment`.
+`environment`. For Camber there is a fully pinned set,
+`requirements/camber-wan.txt`; see [RUNNING_ON_CAMBER.md](RUNNING_ON_CAMBER.md).
 
 Also required on `PATH`: `ffmpeg` (encoding) and `ffprobe` (the runner's
 measurement).
@@ -52,7 +53,18 @@ measurement).
 Hardware: a CUDA GPU with 24 GB+ VRAM. `prepare()` raises
 `BackendNotInstalledError` when the dependencies are missing or
 `torch.cuda.is_available()` is false; such a run is not recorded. Weights are
-downloaded by `prepare()` on first use into the Hugging Face cache.
+downloaded by `prepare()` on first use into the Hugging Face cache
+(34.20 GB, 29 files at the pinned revision).
+
+**Offline use.** With `HF_HUB_OFFLINE=1` the weights are resolved from the
+local cache only (`snapshot_download(..., local_files_only=True)`) and no
+network request is made. If the pinned revision is not complete in the cache,
+the run fails with a message naming `HF_HOME`.
+
+**24 GB cards (e.g. L4).** On disk the transformer is ~20 GB in fp32 (~10 GB
+in bf16 once loaded), the text encoder ~11.4 GB and the VAE ~2.8 GB. Together
+they do not fit in 24 GB of VRAM, so use `cpu_offload=true` there. If decoding
+still runs out of memory, add `vae_tiling=true`.
 
 ## What a request must look like
 
@@ -73,8 +85,9 @@ Allowed `backend_parameters`:
 |---|---|---|
 | `num_inference_steps` | 50 | positive int |
 | `guidance_scale` | 5.0 | number ≥ 0 |
-| `revision` | constructor `revision`, else none | Hugging Face commit sha, tag or branch |
+| `revision` | `b8fff7315c768468a5333511427288870b2e9635` (`WAN_TI2V_5B_REVISION`) | Hugging Face commit sha, tag or branch; the constructor's `revision` changes the default |
 | `cpu_offload` | `false` | `true` uses `enable_model_cpu_offload()` instead of moving the pipeline to the GPU |
+| `vae_tiling` | `false` | `true` calls `pipe.vae.enable_tiling()`: lower VRAM while decoding. A way to retry an out-of-memory failure without a code change |
 
 ## Frame rule
 
@@ -119,8 +132,9 @@ runner's checksum check would fail the run otherwise.
   example passes `image=` to `WanPipeline`; `WanPipeline.__call__` has no
   `image` parameter, so that is not used.
 - Weights are resolved with `huggingface_hub.snapshot_download(repo, revision=...)`
-  and loaded from that snapshot. The resolved commit sha is recorded as
-  `model_version` and `model_parameters.revision`.
+  and loaded from that snapshot. The revision is pinned by default to commit
+  `b8fff7315c768468a5333511427288870b2e9635`. The resolved commit sha is
+  recorded as `model_version` and `model_parameters.revision`.
 - Seed: `torch.Generator(device="cuda").manual_seed(seed)`.
 - `prompt` and `negative_prompt` are passed **unchanged**. `camera_motion`,
   `subject_motion` and `visual_direction` are not folded into the prompt or
@@ -146,7 +160,7 @@ ffmpeg is a `RuntimeError` and therefore a recorded failed run.
 
 `model_parameters`: `model_repo`, `revision`, `pipeline`,
 `num_inference_steps`, `guidance_scale`, `num_frames`, `width`, `height`,
-`fps`, `cpu_offload`, `torch_dtype`, `vae_dtype`, `encoder`.
+`fps`, `cpu_offload`, `vae_tiling`, `torch_dtype`, `vae_dtype`, `encoder`.
 `environment` additionally gets `torch_version`, `diffusers_version`,
 `transformers_version`, `torch_cuda_version`, `ffmpeg_version`.
 `fps` / `frame_count` / `output_media` come from the runner's ffprobe
@@ -160,10 +174,12 @@ measurement, not from the adapter.
 - 24 fps and the two native resolutions only; at most 121 frames (~5 s).
 - `reference_images` are ignored, with a warning. Only the start frame
   conditions the video.
-- `metadata()` is read before the weights are resolved, so a run that fails
-  before generation finishes records `model_version` as the requested
-  revision or `unpinned`, not the commit sha. Pin a commit sha through the
-  constructor or `backend_parameters.revision` for benchmark runs.
+- `metadata()` is read before the request is seen, so a run that fails before
+  generation finishes records `model_version` as the adapter's default
+  revision, even when `backend_parameters.revision` asked for another one.
+  Successful runs record the resolved commit sha.
+- `vae_tiling` may change the decoded pixels slightly (tile blending), so
+  compare runs with the same setting. It is recorded in every run.
 - The H.264 stream carries no colour-space tags; ffmpeg's default RGB→YUV
   conversion is used.
 - Lossy output (CRF 12). Frames are not kept in a lossless form.

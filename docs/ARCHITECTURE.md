@@ -53,6 +53,12 @@ carry `task_type`.
 An adapter imports its heavy dependencies only when it is prepared, so the
 package and the test suite work on a machine without any model installed.
 
+Names are mapped to adapter classes in one place,
+`src/ai_studio/generation/backends/registry.py` (`BACKENDS`, `get_backend`).
+Launchers use it: the command line (`src/ai_studio/cli.py`,
+`scripts/run_benchmark.py`) resolves `--backend` to a class and hands the
+runner an instance. The runner never imports the registry.
+
 ## Future pipeline
 
 ```

@@ -25,6 +25,7 @@ from ai_studio.generation.backends import (
 )
 from ai_studio.generation.backends import wan_ti2v
 from ai_studio.generation.backends.wan_ti2v import (
+    WAN_TI2V_5B_REVISION,
     encode_frames,
     frame_count_for,
     frame_to_uint8,
@@ -140,12 +141,13 @@ def test_metadata_works_without_torch(monkeypatch):
     assert meta.backend_name == "wan-ti2v-5b"
     assert meta.backend_version == "upstream-diffusers-0.1"
     assert meta.model_name == "Wan2.2-TI2V-5B"
-    assert meta.model_version == "unpinned"
+    assert meta.model_version == WAN_TI2V_5B_REVISION == "b8fff7315c768468a5333511427288870b2e9635"
     assert meta.workflow_version == "i2v-v1"
 
 
 def test_metadata_reports_pinned_revision():
     assert WanTI2V5BBackend(revision="abc123").metadata().model_version == "abc123"
+    assert WanTI2V5BBackend(revision=None).metadata().model_version == "unpinned"
 
 
 @pytest.mark.parametrize("missing", ["torch", "diffusers"])
@@ -214,6 +216,7 @@ def test_valid_request_accepted():
         ({"backend_parameters": {"guidance_scale": -1}}, "guidance_scale"),
         ({"backend_parameters": {"revision": ""}}, "revision"),
         ({"backend_parameters": {"cpu_offload": "yes"}}, "cpu_offload"),
+        ({"backend_parameters": {"vae_tiling": 1}}, "vae_tiling"),
     ],
 )
 def test_invalid_requests_rejected(overrides, match):
@@ -225,8 +228,157 @@ def test_all_allowed_backend_parameters_accepted():
     backend = WanTI2V5BBackend()
     backend.validate_inputs(make_request(backend_parameters={
         "num_inference_steps": 30, "guidance_scale": 4, "revision": "abc123", "cpu_offload": True,
+        "vae_tiling": True,
     }))
     assert backend.metadata().model_version == "abc123"
+
+
+# --- vae_tiling ---
+
+class TilingPipeline(FakePipeline):
+    def __init__(self):
+        super().__init__()
+        self.tiling_calls = 0
+        self.vae = SimpleNamespace(enable_tiling=self._enable_tiling)
+
+    def _enable_tiling(self):
+        self.tiling_calls += 1
+
+
+@pytest.mark.parametrize("requested, expected_calls", [({"vae_tiling": True}, 1), ({"vae_tiling": False}, 0), ({}, 0)])
+def test_vae_tiling_is_enabled_only_on_request(requested, expected_calls):
+    pipeline = TilingPipeline()
+    backend = WanTI2V5BBackend(pipeline_factory=lambda: pipeline)
+    backend.validate_inputs(make_request(backend_parameters=requested))
+    backend.prepare()
+    backend.prepare()  # same settings: not loaded or tiled twice
+    assert pipeline.tiling_calls == expected_calls
+
+
+def test_changing_vae_tiling_reloads_the_pipeline():
+    created = []
+
+    def factory():
+        created.append(TilingPipeline())
+        return created[-1]
+
+    backend = WanTI2V5BBackend(pipeline_factory=factory)
+    backend.validate_inputs(make_request())
+    backend.prepare()
+    backend.validate_inputs(make_request(backend_parameters={"vae_tiling": True}))
+    backend.prepare()
+    assert [p.tiling_calls for p in created] == [0, 1]
+
+
+# --- loading the real pipeline (torch / diffusers / huggingface_hub mocked) ---
+
+class FakeLoadedPipeline:
+    def __init__(self, expand_timesteps=True):
+        self.config = SimpleNamespace(expand_timesteps=expand_timesteps)
+        self.events = []
+        self.vae = SimpleNamespace(enable_tiling=lambda: self.events.append("vae.enable_tiling"))
+
+    def enable_model_cpu_offload(self):
+        self.events.append("enable_model_cpu_offload")
+
+    def to(self, device):
+        self.events.append(f"to({device})")
+
+
+@pytest.fixture
+def fake_stack(monkeypatch, tmp_path):
+    """Stand-ins for torch, diffusers, transformers and huggingface_hub that
+    record how the adapter loads the model."""
+    log = SimpleNamespace(snapshot=[], vae=[], pipeline=[], pipe=FakeLoadedPipeline())
+    snapshot_dir = tmp_path / "hub" / "snapshots" / "0123abc"
+    snapshot_dir.mkdir(parents=True)
+
+    def module(name, **attrs):
+        fake = type(sys)(name)
+        vars(fake).update(attrs)
+        return fake
+
+    def snapshot_download(repo, **kwargs):
+        log.snapshot.append((repo, kwargs))
+        return str(snapshot_dir)
+
+    class AutoencoderKLWan:
+        @staticmethod
+        def from_pretrained(path, **kwargs):
+            log.vae.append((Path(path), kwargs))
+            return "the-vae"
+
+    class WanImageToVideoPipeline:
+        @staticmethod
+        def from_pretrained(path, **kwargs):
+            log.pipeline.append((Path(path), kwargs))
+            return log.pipe
+
+    monkeypatch.setitem(sys.modules, "torch", module(
+        "torch", __version__="2.8.0+cu126", float32="float32", bfloat16="bfloat16",
+        cuda=SimpleNamespace(is_available=lambda: True), version=SimpleNamespace(cuda="12.6"),
+        Generator=lambda device: SimpleNamespace(manual_seed=lambda seed: ("generator", device, seed)),
+    ))
+    monkeypatch.setitem(sys.modules, "diffusers", module(
+        "diffusers", __version__="0.35.2",
+        AutoencoderKLWan=AutoencoderKLWan, WanImageToVideoPipeline=WanImageToVideoPipeline,
+    ))
+    monkeypatch.setitem(sys.modules, "transformers", module("transformers", __version__="4.56.2"))
+    monkeypatch.setitem(sys.modules, "huggingface_hub", module("huggingface_hub", snapshot_download=snapshot_download))
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    log.snapshot_dir = snapshot_dir
+    return log
+
+
+def test_prepare_loads_the_pinned_revision_as_documented(fake_stack):
+    backend = WanTI2V5BBackend()
+    backend.validate_inputs(make_request())
+    backend.prepare()
+
+    assert fake_stack.snapshot == [(
+        "Wan-AI/Wan2.2-TI2V-5B-Diffusers", {"revision": WAN_TI2V_5B_REVISION, "local_files_only": False},
+    )]
+    assert fake_stack.vae == [(fake_stack.snapshot_dir, {"subfolder": "vae", "torch_dtype": "float32"})]
+    assert fake_stack.pipeline == [(fake_stack.snapshot_dir, {"vae": "the-vae", "torch_dtype": "bfloat16"})]
+    assert fake_stack.pipe.events == ["to(cuda)"]
+    assert backend.metadata().model_version == "0123abc"  # the resolved snapshot commit
+    assert backend._make_generator(7) == ("generator", "cuda", 7)
+    assert backend._environment == {
+        "torch_version": "2.8.0+cu126", "diffusers_version": "0.35.2",
+        "transformers_version": "4.56.2", "torch_cuda_version": "12.6",
+    }
+
+
+def test_prepare_with_cpu_offload_and_vae_tiling(fake_stack):
+    backend = WanTI2V5BBackend()
+    backend.validate_inputs(make_request(backend_parameters={"cpu_offload": True, "vae_tiling": True}))
+    backend.prepare()
+    assert fake_stack.pipe.events == ["vae.enable_tiling", "enable_model_cpu_offload"]
+
+
+@pytest.mark.parametrize("value, offline", [("1", True), ("true", True), ("0", False), ("", False)])
+def test_hf_hub_offline_resolves_from_the_local_cache_only(fake_stack, monkeypatch, value, offline):
+    monkeypatch.setenv("HF_HUB_OFFLINE", value)
+    backend = WanTI2V5BBackend()
+    backend.validate_inputs(make_request())
+    backend.prepare()
+    assert fake_stack.snapshot[0][1]["local_files_only"] is offline
+
+
+def test_offline_with_missing_weights_explains_itself(fake_stack, monkeypatch):
+    def not_cached(repo, **kwargs):
+        raise OSError("snapshot folder not found")
+
+    monkeypatch.setattr(sys.modules["huggingface_hub"], "snapshot_download", not_cached)
+    monkeypatch.setenv("HF_HUB_OFFLINE", "1")
+    with pytest.raises(RuntimeError, match="HF_HUB_OFFLINE is set"):
+        WanTI2V5BBackend().prepare()
+
+
+def test_wrong_weights_are_rejected(fake_stack):
+    fake_stack.pipe.config.expand_timesteps = False
+    with pytest.raises(RuntimeError, match="wrong weights"):
+        WanTI2V5BBackend().prepare()
 
 
 # --- start-frame preprocessing ---
@@ -438,7 +590,7 @@ def test_end_to_end_with_real_encoding_and_real_ffprobe(project, rooftop):
     assert record.inference_steps == 30 and record.guidance == 5.0
     assert record.model_parameters == {
         "model_repo": "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
-        "revision": None,
+        "revision": WAN_TI2V_5B_REVISION,
         "pipeline": "WanImageToVideoPipeline",
         "num_inference_steps": 30,
         "guidance_scale": 5.0,
@@ -447,6 +599,7 @@ def test_end_to_end_with_real_encoding_and_real_ffprobe(project, rooftop):
         "height": 704,
         "fps": 24,
         "cpu_offload": False,
+        "vae_tiling": False,
         "torch_dtype": "bfloat16",
         "vae_dtype": "float32",
         "encoder": {

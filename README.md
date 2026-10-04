@@ -33,6 +33,9 @@ implemented but not yet run on a GPU
 candidates are still placeholders.
 See [docs/PHASE_1_BENCHMARK.md](docs/PHASE_1_BENCHMARK.md).
 
+Running a benchmark on a cloud GPU (Camber, free L4 node), step by step from
+Windows: [docs/RUNNING_ON_CAMBER.md](docs/RUNNING_ON_CAMBER.md).
+
 > No modification is considered an improvement until it beats the previous
 > version on the fixed benchmark suite.
 
@@ -65,7 +68,9 @@ benchmarks/
   evaluations/    human ratings (editing), one file per evaluator and revision
   comic_evaluations/  experimental comic ratings (generation)
 configs/          configuration (quality thresholds, later backends)
-scripts/          command-line entry points (future)
+scripts/          run_benchmark.py (CLI), make_bundle / collect_run / import_run,
+                  camber_setup / camber_run
+requirements/     exact package pins per cloud environment
 tests/            unit tests
 docs/             architecture and roadmap
 outputs/          generated media (git-ignored)

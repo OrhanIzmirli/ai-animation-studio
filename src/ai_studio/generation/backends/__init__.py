@@ -10,10 +10,12 @@ from ai_studio.generation.backends.base import (
 )
 from ai_studio.generation.backends.joyai import JoyAIVideoEditBackend
 from ai_studio.generation.backends.kiwi import KiwiEditBackend
+from ai_studio.generation.backends.registry import BACKENDS, get_backend
 from ai_studio.generation.backends.wan_editctrl import WanEditCtrlBackend
 from ai_studio.generation.backends.wan_ti2v import WanTI2V5BBackend
 
 __all__ = [
+    "BACKENDS",
     "BackendMetadata",
     "BackendNotInstalledError",
     "JoyAIVideoEditBackend",
@@ -24,4 +26,5 @@ __all__ = [
     "VideoGenerationBackend",
     "WanEditCtrlBackend",
     "WanTI2V5BBackend",
+    "get_backend",
 ]

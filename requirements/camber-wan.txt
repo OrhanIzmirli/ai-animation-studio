@@ -1,0 +1,29 @@
+# Exact pins for the Wan 2.2 TI2V-5B backend on Camber:
+# Linux x86_64, Python 3.11, one NVIDIA L4 (24 GB), CUDA 12.x driver.
+# Installed by scripts/camber_setup.py. See docs/RUNNING_ON_CAMBER.md.
+#
+# torch / torchvision come from the PyTorch wheel index (CUDA 12.6 build);
+# everything else from PyPI. The set was checked for mutual compatibility
+# with pip's resolver for manylinux / cp311 on 2026-10-04.
+#
+# If torch.cuda.is_available() is False on a GPU node because the NVIDIA
+# driver is too old for CUDA 12.6, switch the three torch lines to the
+# CUDA 12.4 build: index .../whl/cu124, torch==2.6.0+cu124,
+# torchvision==0.21.0+cu124.
+
+--extra-index-url https://download.pytorch.org/whl/cu126
+
+torch==2.8.0+cu126
+torchvision==0.23.0+cu126
+
+diffusers==0.35.2
+transformers==4.56.2
+tokenizers==0.22.1
+safetensors==0.6.2
+sentencepiece==0.2.1
+accelerate==1.10.1
+huggingface_hub==0.35.3
+ftfy==6.3.1
+pillow==11.3.0
+numpy==2.2.6
+pyyaml==6.0.3
