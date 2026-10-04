@@ -41,6 +41,18 @@ Adding `VIDEO_REPAIR` later means adding a `Capability` member, a request type
 and a `VideoRepairBackend` contract. The runner and record schema already
 carry `task_type`.
 
+## Backends
+
+| Backend | Capability | State |
+|---|---|---|
+| `WanTI2V5BBackend` (`wan_ti2v.py`) | generation, image-to-video (start frame) | implemented; needs the `wan` extra and a CUDA GPU. See [BACKEND_WAN_TI2V_5B.md](BACKEND_WAN_TI2V_5B.md) |
+| `JoyAIVideoEditBackend` (`joyai.py`) | editing | placeholder, not installed |
+| `KiwiEditBackend` (`kiwi.py`) | editing | placeholder, not installed |
+| `WanEditCtrlBackend` (`wan_editctrl.py`) | editing | placeholder, not installed |
+
+An adapter imports its heavy dependencies only when it is prepared, so the
+package and the test suite work on a machine without any model installed.
+
 ## Future pipeline
 
 ```

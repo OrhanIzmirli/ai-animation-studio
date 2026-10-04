@@ -27,7 +27,10 @@ The benchmark infrastructure (1A: backend interface, runner, YAML definitions,
 human evaluation schema) covers video editing and video generation (1B). In 1C
 the runner measures every output video with ffprobe and enforces a
 benchmark's pinned fps and duration instead of trusting what the backend
-reports. Candidate backends are placeholders; no model is installed.
+reports. The first real adapter, Wan 2.2 TI2V-5B (image-to-video), is
+implemented but not yet run on a GPU
+([docs/BACKEND_WAN_TI2V_5B.md](docs/BACKEND_WAN_TI2V_5B.md)); the editing
+candidates are still placeholders.
 See [docs/PHASE_1_BENCHMARK.md](docs/PHASE_1_BENCHMARK.md).
 
 > No modification is considered an improvement until it beats the previous

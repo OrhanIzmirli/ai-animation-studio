@@ -11,6 +11,7 @@ from ai_studio.generation.backends.base import (
 from ai_studio.generation.backends.joyai import JoyAIVideoEditBackend
 from ai_studio.generation.backends.kiwi import KiwiEditBackend
 from ai_studio.generation.backends.wan_editctrl import WanEditCtrlBackend
+from ai_studio.generation.backends.wan_ti2v import WanTI2V5BBackend
 
 __all__ = [
     "BackendMetadata",
@@ -22,4 +23,5 @@ __all__ = [
     "VideoEditingBackend",
     "VideoGenerationBackend",
     "WanEditCtrlBackend",
+    "WanTI2V5BBackend",
 ]

@@ -16,7 +16,9 @@ quality config, tests, documentation. No AI models.
   ([BENCHMARK_COMIC_ROOFTOP_01.md](BENCHMARK_COMIC_ROOFTOP_01.md)).
 - **1C** *(current)* — the runner measures the output video (ffprobe) and
   enforces pinned fps and duration instead of trusting backend-reported
-  values. No models installed yet.
+  values. First real generation adapter: Wan 2.2 TI2V-5B, image-to-video
+  ([BACKEND_WAN_TI2V_5B.md](BACKEND_WAN_TI2V_5B.md)), tested with an injected
+  pipeline. Next: its first run on a GPU; no baseline results exist yet.
 
 See [PHASE_1_BENCHMARK.md](PHASE_1_BENCHMARK.md).
 
