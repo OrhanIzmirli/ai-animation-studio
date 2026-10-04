@@ -47,6 +47,10 @@ Exceptions are never swallowed. Not recorded, and raised as-is:
   - UnsupportedCapabilityError: backend lacks the request's capability
   - BackendNotInstalledError: a configuration problem, not a model result
   - KeyboardInterrupt / SystemExit (only Exception subclasses are caught)
+After a successful run is recorded, its output video and derived start frame
+are marked read-only (ai_studio.protection), so they cannot be deleted or
+overwritten by accident.
+
 Timeouts are the backend's job (only it can stop its own inference); a
 TimeoutError raised by the backend is recorded like any other failure.
 """
@@ -78,6 +82,7 @@ from ai_studio.generation.result import GenerationResult
 from ai_studio.media import image_dimensions
 from ai_studio.media_probe import ProbeUnavailableError, VideoInfo, ffprobe_video
 from ai_studio.paths import project_root, resolve_path, to_project_relative
+from ai_studio.protection import protect_run_files
 
 MAX_ERROR_MESSAGE_CHARS = 4000
 # Why a run was made; stored as task_parameters["run_purpose"]. Only
@@ -262,6 +267,9 @@ class BenchmarkRunner:
         except Exception as exc:
             failed = self._save_failure(run, exc, "logging")
             raise BenchmarkRunError("logging", failed, exc) from exc
+        # Verified and recorded: from now on the run's video and derived start
+        # frame must not change. Read-only guards them against accidents.
+        protect_run_files(record, self.root)
         return record
 
     # --- helpers ---

@@ -107,6 +107,11 @@ def setup(project_root: Path = PROJECT_ROOT) -> None:
         conda = shutil.which("conda") or "/opt/conda/bin/conda"
         if ENV_DIR.exists():
             # Left over from an interrupted create: conda refuses a non-empty prefix.
+            resolved = ENV_DIR.resolve()
+            for folder in ("outputs", "benchmarks"):  # clean-up never touches run data
+                data = (project_root / folder).resolve()
+                if resolved == data or data in resolved.parents:
+                    raise SetupError(f"refusing to remove {ENV_DIR}: it is inside the project's {folder}/")
             print(f"removing incomplete env {ENV_DIR}")
             shutil.rmtree(ENV_DIR)
         ENVS_DIR.mkdir(parents=True, exist_ok=True)
