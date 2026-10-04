@@ -59,6 +59,9 @@ benchmarks/references/**
 !benchmarks/references/**/.gitkeep
 !benchmarks/references/**/README.md
 
+# Spike outputs (frames, videos, logs); spike scripts and reports are tracked.
+spikes/output/
+
 # --- Temporary files ---
 tmp/
 temp/
