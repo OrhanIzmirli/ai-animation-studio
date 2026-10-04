@@ -51,6 +51,12 @@ After a successful run is recorded, its output video and derived start frame
 are marked read-only (ai_studio.protection), so they cannot be deleted or
 overwritten by accident.
 
+An in-progress marker (ai_studio.benchmarking.in_progress) is written into the
+output directory right before generation and removed when the run's record,
+success or failed, is saved. A run that dies in between leaves the marker
+behind; scripts/find_abandoned_runs.py finds it and can record the run as
+failed with failure_stage "abandoned".
+
 Timeouts are the backend's job (only it can stop its own inference); a
 TimeoutError raised by the backend is recorded like any other failure.
 """
@@ -68,6 +74,12 @@ from typing import Any
 
 from ai_studio.benchmarking.definitions import BenchmarkDefinition, DraftBenchmarkError
 from ai_studio.benchmarking.environment import collect_environment
+from ai_studio.benchmarking.in_progress import (
+    ABANDONED_ERROR_TYPE,
+    ABANDONED_STAGE,
+    remove_marker,
+    write_marker,
+)
 from ai_studio.benchmarking.logger import BenchmarkLogger, new_run_id
 from ai_studio.benchmarking.request import BenchmarkRequest
 from ai_studio.benchmarking.schema import BenchmarkResult, Resolution, check_file_name_safe
@@ -244,6 +256,7 @@ class BenchmarkRunner:
 
             enter("generation")
             output_dir.mkdir(parents=True, exist_ok=False)  # never reuse an output dir
+            self._mark_in_progress(run, output_dir)
             run.result = backend.generate(resolved, output_dir)
 
             enter("verification")
@@ -267,6 +280,7 @@ class BenchmarkRunner:
         except Exception as exc:
             failed = self._save_failure(run, exc, "logging")
             raise BenchmarkRunError("logging", failed, exc) from exc
+        remove_marker(output_dir)
         # Verified and recorded: from now on the run's video and derived start
         # frame must not change. Read-only guards them against accidents.
         protect_run_files(record, self.root)
@@ -374,7 +388,22 @@ class BenchmarkRunner:
         except Exception as exc:
             return {"collection_error": f"{_error_type(exc)}: {exc}"}
 
-    def _build_record(self, run: _Run, failure: dict[str, Any] | None = None) -> BenchmarkResult:
+    def _mark_in_progress(self, run: _Run, output_dir: Path) -> None:
+        """Write the in-progress marker: the record to save if this run is
+        abandoned. The environment is not collected here (that happens once,
+        when the real record is built)."""
+        failure = {
+            "status": "failed",
+            "failure_stage": ABANDONED_STAGE,
+            "error_type": ABANDONED_ERROR_TYPE,
+            "error_message": None,
+        }
+        record = self._build_record(run, failure, environment={})
+        write_marker(output_dir, dataclasses.replace(record, model_parameters=_json_safe(record.model_parameters)))
+
+    def _build_record(
+        self, run: _Run, failure: dict[str, Any] | None = None, environment: dict[str, Any] | None = None,
+    ) -> BenchmarkResult:
         request, meta = run.request, run.meta
         valid_result = run.result if isinstance(run.result, GenerationResult) else None
         effective = valid_result.parameters if valid_result else {}
@@ -395,7 +424,7 @@ class BenchmarkRunner:
                     f"backend-reported generation time: {valid_result.generation_time_seconds:.3f}s"
                 )
 
-        environment = self._collect_environment()
+        environment = self._collect_environment() if environment is None else dict(environment)
         if valid_result:
             environment.update(valid_result.environment)
 
@@ -487,6 +516,7 @@ class BenchmarkRunner:
                 environment=_json_safe(record.environment),
             )
             self.logger.log(record)  # "x" mode: never overwrites
+            remove_marker(self.outputs_dir / run.benchmark_id / run.run_id)
             return record
         except Exception as save_exc:
             exc.add_note(f"failed-run record could not be saved: {_error_type(save_exc)}: {save_exc}")

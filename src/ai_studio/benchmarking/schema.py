@@ -51,6 +51,13 @@ Schema history:
        only as a fallback). Why: a pinned fps / duration cannot be enforced
        from what the backend claims. Migration: none; v1-v7 load with None,
        and their fps / frame_count remain backend-reported.
+     (no version change) failure_stage may also be "abandoned": the run
+       started generating and no record was ever saved. Such a record is
+       never written by the runner, only afterwards by
+       scripts/find_abandoned_runs.py from the run's in-progress marker
+       (ai_studio.benchmarking.in_progress). No field was added or changed,
+       so the version stays 8; code older than this change rejects such a
+       record when loading it.
 """
 
 from __future__ import annotations
@@ -70,7 +77,7 @@ START_FRAME_KEYS = (
     "path", "sha256", "original_width", "original_height",
     "preprocessing", "effective_width", "effective_height", "derived_file",
 )
-FAILURE_STAGES = ("validation", "prepare", "generation", "verification", "logging")
+FAILURE_STAGES = ("validation", "prepare", "generation", "verification", "logging", "abandoned")
 
 _UNSAFE_FILE_NAME_CHARS = '/\\:*?"<>|'
 
