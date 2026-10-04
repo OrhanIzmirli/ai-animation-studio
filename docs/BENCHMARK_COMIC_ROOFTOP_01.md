@@ -3,7 +3,8 @@
 **Phase 1B.1 — first comic animation benchmark.**
 Definition: [`benchmarks/definitions/comic_rooftop_01.yaml`](../benchmarks/definitions/comic_rooftop_01.yaml)
 Task type: **`video_generation`** (no source video).
-Status: defined; reference assets not yet created; no model installed.
+Status: **`ready`** (explicit human decision, 2026-09-30, after the canonical
+start frame was supplied). No runs yet; no model installed.
 
 ## Goal
 
@@ -39,9 +40,35 @@ mask, logo, emblem or text.
 **Canonical start frame:** `benchmarks/references/comic_hero_01/rooftop_frame_v001.png`
 (1672×941 PNG, SHA-256 `3a3e7675…dbf1e0fb`). It is the benchmark's
 `start_frame`, the exact image conditioning frame 0 (image-to-video), and
-is not listed in `reference_images`. The benchmark pins `duration_seconds: 5`
-and `fps: 24`. Only backends that declare start-frame conditioning can run it.
+is not listed in `reference_images`. The benchmark pins `duration_seconds: 5`,
+`fps: 24` and `duration_tolerance_seconds: 0.1`. Only backends that declare
+start-frame conditioning can run it.
 Further sheets (front, profile, ...) are planned. See that folder's README.
+
+## Pinned fps and duration (measured, not reported)
+
+The runner **measures** every output video with ffprobe (decoding and counting
+the frames) instead of trusting the `fps` / `frame_count` a backend reports.
+For this benchmark a run fails verification, and is recorded as a failed run,
+when:
+
+- the measured fps differs from the pinned **24 fps** by more than 0.01
+  (23.976 is not 24)
+- the measured duration, `frame_count / fps`, is more than
+  **`duration_tolerance_seconds: 0.1`** away from `duration_seconds: 5`
+- the backend's reported fps or frame count disagrees with the measurement
+- ffprobe is not installed, because the pins could then not be verified
+
+Why a tolerance and not exactly 5 s: models generate frame counts on their own
+grid. Wan-family models produce 4n+1 frames, so the closest clip to 5 s at
+24 fps is 121 frames = 5.042 s. A tolerance of 0.1 s accepts that (118 to 122
+frames at 24 fps) but rejects a 4 s or 6 s clip. There is no run-time
+override: the tolerance is pinned in the definition like `fps`.
+
+A measured resolution different from the requested `output_resolution` is only
+a warning in the record's `notes`, since models round to their own size grid
+(e.g. 1280×704). The measurement is stored in the record's `output_media`
+block, and the record's `fps` / `frame_count` hold the measured values.
 
 ## Visual direction
 
@@ -141,9 +168,10 @@ runs must use:
 - the same YAML definition, prompt and negative prompt
 - the same reference images (verified by checksum)
 - the same set of seeds per backend
-- the same output resolution, and the same fps and duration target where the
-  backend allows it. Backends that cannot hit ~5 s record their actual
-  `fps` / `frame_count`.
+- the same output resolution
+- the pinned 24 fps and a measured duration within 0.1 s of 5 s. A backend
+  that cannot produce that fails verification; it is not compared on a
+  shorter or longer clip.
 
 ## Resolved and open gaps
 
@@ -154,15 +182,14 @@ Resolved in Phase 1B:
 - **Structured shot fields.** `duration_seconds`, `camera_motion`,
   `subject_motion` and `visual_direction` are real definition fields and are
   recorded with every run.
+- **Start frame and status.** The canonical start frame exists and is pinned
+  by checksum; the definition is `status: ready`.
+- **Trusting backend-reported fps / frame count.** The runner measures the
+  output video and enforces the pinned fps and duration tolerance (Phase 1C).
 - **Criteria.** The comic criteria have their own experimental
   `ComicAnimationEvaluation` schema and store.
 
 Open:
-1. **The definition stays `status: draft` until the reference sheet exists.**
-   It is complete enough to run text-only, because `reference_images` may
-   legitimately be empty for generation, but the runner refuses drafts. A
-   human marks it `ready` once the COMIC_HERO_01 sheet is final and listed in
-   `reference_images`.
-2. **Reference assets are external reproducibility dependencies.** They are
+1. **Reference assets are external reproducibility dependencies.** They are
    checksummed, not version-controlled. Shared object storage comes before
    multi-machine reproduction (see PHASE_1_BENCHMARK.md).

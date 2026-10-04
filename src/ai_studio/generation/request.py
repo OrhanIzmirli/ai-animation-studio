@@ -12,6 +12,11 @@ start_frame vs reference_images - NOT interchangeable:
   reference_images  additional identity / style / subject references.
 The same file may not appear in both.
 
+duration_tolerance_seconds: how far the MEASURED output duration
+(frame_count / fps) may be from duration_seconds. None: duration is not
+enforced. Models generate frame counts on their own grid (e.g. 4n+1 frames),
+so an exact match is usually impossible.
+
 Shot controls (camera_motion, subject_motion, visual_direction) are generic
 free-form descriptions: a string, a list of strings, or a JSON-like mapping.
 Backends decide how to use them (fold into the prompt, map to their own
@@ -40,6 +45,13 @@ def _check_json(name: str, value: Any) -> None:
         raise ValueError(f"{name} must be JSON-serializable: {e}") from None
 
 
+def check_duration_tolerance(value: Any) -> None:
+    if value is not None and (
+        not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0
+    ):
+        raise ValueError("duration_tolerance_seconds must be a number >= 0 or None")
+
+
 def check_shot_control(name: str, value: Any) -> None:
     if value is None:
         return
@@ -64,6 +76,7 @@ class VideoGenerationRequest:
     output_resolution: Resolution
     seed: int
     fps: float | None = None  # None: backend default (the backend reports what it used)
+    duration_tolerance_seconds: float | None = None  # None: duration not enforced
     negative_prompt: str | None = None
     start_frame: str | None = None  # conditions frame 0; see module docstring
     reference_images: list[str] = field(default_factory=list)
@@ -87,6 +100,7 @@ class VideoGenerationRequest:
             not isinstance(self.fps, (int, float)) or isinstance(self.fps, bool) or self.fps <= 0
         ):
             raise ValueError("fps must be a positive number or None")
+        check_duration_tolerance(self.duration_tolerance_seconds)
         if not isinstance(self.output_resolution, Resolution):
             raise ValueError("output_resolution must be a Resolution")
         if not isinstance(self.seed, int) or isinstance(self.seed, bool):
@@ -127,6 +141,7 @@ class VideoGenerationRequest:
         return {
             "duration_seconds": self.duration_seconds,
             "requested_fps": self.fps,
+            "duration_tolerance_seconds": self.duration_tolerance_seconds,
             "camera_motion": self.camera_motion,
             "subject_motion": self.subject_motion,
             "visual_direction": self.visual_direction,

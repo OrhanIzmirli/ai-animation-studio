@@ -52,6 +52,11 @@ negative_prompt: >-
 
 duration_seconds: 5
 fps: 24
+# Max |measured duration - duration_seconds|; measured = frame_count / fps of
+# the output video (the runner measures it, it does not trust the backend).
+# Models generate frame counts on their own grid (e.g. Wan 4n+1 -> 121 frames
+# = 5.042 s at 24 fps); 0.1 s accepts that but rejects a 4 s or 6 s clip.
+duration_tolerance_seconds: 0.1
 
 camera_motion: slow cinematic push-in from a low three-quarter angle behind the character
 

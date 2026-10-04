@@ -21,10 +21,13 @@ evaluates the output, diagnoses what failed and where, repairs only that part,
 and evaluates again. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
-## Current status: Phase 1A — Multi-backend benchmark infrastructure
+## Current status: Phase 1C — Measured benchmark outputs
 
-Backend interface, benchmark runner, YAML benchmark definitions and human
-evaluation schema. Candidate backends are placeholders; no model is installed.
+The benchmark infrastructure (1A: backend interface, runner, YAML definitions,
+human evaluation schema) covers video editing and video generation (1B). In 1C
+the runner measures every output video with ffprobe and enforces a
+benchmark's pinned fps and duration instead of trusting what the backend
+reports. Candidate backends are placeholders; no model is installed.
 See [docs/PHASE_1_BENCHMARK.md](docs/PHASE_1_BENCHMARK.md).
 
 > No modification is considered an improvement until it beats the previous
@@ -49,7 +52,8 @@ src/ai_studio/
   quality/        modular quality evaluators (future)
   repair/         local repair (future)
   pipeline/       orchestration of the stages (future)
-  benchmarking/   schemas, logger, environment capture, runner (Phase 0-1A)
+  media_probe.py  measures output videos with ffprobe
+  benchmarking/   schemas, logger, environment capture, runner (Phase 0-1C)
 benchmarks/
   definitions/    fixed benchmark definitions (YAML)
   inputs/         original input files — never modified
@@ -66,7 +70,9 @@ outputs/          generated media (git-ignored)
 
 ## Setup
 
-Requires Python 3.11.
+Requires Python 3.11. Benchmarks that pin fps or duration also need `ffprobe`
+(FFmpeg) on `PATH`; the tests that use the real ffmpeg/ffprobe are skipped
+when it is missing.
 
 ```bash
 py -3.11 -m venv .venv

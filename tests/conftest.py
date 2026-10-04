@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -6,6 +7,7 @@ from ai_studio.benchmarking import BenchmarkLogger, BenchmarkRequest, BenchmarkR
 from ai_studio.generation.backends import BackendMetadata, VideoEditingBackend, VideoGenerationBackend
 from ai_studio.generation.request import VideoGenerationRequest
 from ai_studio.generation.result import GenerationResult
+from ai_studio.media_probe import ProbeUnavailableError, VideoInfo
 
 FAKE_ENVIRONMENT = {
     "operating_system": "TestOS",
@@ -20,6 +22,31 @@ FAKE_ENVIRONMENT = {
     "cuda_version": None,
     "pytorch_version": None,
 }
+
+FAKE_VIDEO_MARKER = "ai_studio fake video"
+
+
+def fake_video_bytes(width=1280, height=720, fps=24, frame_count=81):
+    """A small JSON stand-in for a video file that fake_probe can 'measure'."""
+    return json.dumps({
+        "format": FAKE_VIDEO_MARKER, "width": width, "height": height,
+        "fps": fps, "frame_count": frame_count,
+    }).encode()
+
+
+def fake_probe(path):
+    """Media probe for tests: measures fake_video_bytes files. Any other file
+    behaves as if no probe tool were installed."""
+    try:
+        data = json.loads(Path(path).read_bytes())
+    except (OSError, ValueError):
+        data = None
+    if not isinstance(data, dict) or data.get("format") != FAKE_VIDEO_MARKER:
+        raise ProbeUnavailableError(f"fake probe cannot measure {path}")
+    return VideoInfo(
+        probe="fake-probe 1.0", width=data["width"], height=data["height"],
+        fps=data["fps"], frame_count=data["frame_count"], codec="fake",
+    )
 
 
 class FakeBackend(VideoEditingBackend):
@@ -106,7 +133,8 @@ def input_files(project):
     reference = project / "benchmarks" / "references" / "ref.png"
     source.parent.mkdir(parents=True)
     reference.parent.mkdir(parents=True)
-    source.write_bytes(b"fake video bytes")
+    # FakeBackend copies it, so its output measures as 1280x720, 24 fps, 81 frames.
+    source.write_bytes(fake_video_bytes(1280, 720, 24, 81))
     reference.write_bytes(b"fake image bytes")
     return source, reference
 
@@ -139,13 +167,14 @@ def runner(project):
         outputs_dir="outputs",  # relative: resolved against the project root
         environment_collector=lambda: dict(FAKE_ENVIRONMENT),
         root=project,
+        media_probe=fake_probe,
     )
 
 
 # --- video generation fakes ---
 
 class FakeGenerationBackend(VideoGenerationBackend):
-    """Model-free generation backend: writes a small fake video file."""
+    """Model-free generation backend: writes a fake video matching what it reports."""
 
     def __init__(self, *, fail_in=None, exc=None, output_name="gen.mp4"):
         self.fail_in, self.exc, self.output_name = fail_in, exc, output_name
@@ -173,13 +202,15 @@ class FakeGenerationBackend(VideoGenerationBackend):
             raise self.exc
         output = Path(output_dir) / self.output_name
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_bytes(b"generated video bytes")
         fps = request.fps or 16
+        frame_count = round(request.duration_seconds * fps)
+        resolution = request.output_resolution
+        output.write_bytes(fake_video_bytes(resolution.width, resolution.height, fps, frame_count))
         return GenerationResult(
             output_video=str(output), backend_name="fake-gen", backend_version="1.0",
             model_name="fake-t2v", model_version="3.0",
             parameters={**request.backend_parameters, "sampler": "fake"},
-            fps=fps, frame_count=round(request.duration_seconds * fps),
+            fps=fps, frame_count=frame_count,
         )
 
 

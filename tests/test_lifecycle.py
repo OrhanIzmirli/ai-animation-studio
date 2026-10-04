@@ -13,7 +13,7 @@ from ai_studio.benchmarking import (
     load_definition,
     load_definitions,
 )
-from conftest import FAKE_ENVIRONMENT, FakeBackend, FakeGenerationBackend
+from conftest import FAKE_ENVIRONMENT, FakeBackend, FakeGenerationBackend, fake_probe
 
 REPO_DEFINITIONS = Path(__file__).resolve().parents[1] / "benchmarks" / "definitions"
 RES = Resolution(width=64, height=64)
@@ -37,7 +37,7 @@ def write(directory, text, name="def.yaml"):
 def project_runner(project):
     return BenchmarkRunner(
         BenchmarkLogger(project / "benchmarks" / "results"), "outputs",
-        environment_collector=lambda: dict(FAKE_ENVIRONMENT), root=project,
+        environment_collector=lambda: dict(FAKE_ENVIRONMENT), root=project, media_probe=fake_probe,
     )
 
 

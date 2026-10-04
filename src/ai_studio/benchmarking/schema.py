@@ -42,6 +42,15 @@ Schema history:
        had no start frame. Why: frame 0 conditioning must be pinned to an
        exact file and the backend's preprocessing must be visible for a fair
        image-to-video comparison. Migration: none; v1-v6 load with None.
+  8  + output_media: the output video as MEASURED by the runner's media probe
+       {probe, width, height, fps, frame_count, duration_seconds, codec}
+       (keys: ai_studio.media_probe.OUTPUT_MEDIA_KEYS; duration_seconds =
+       frame_count / fps). Only successful runs may carry it; None when no
+       probe was available. From v8 the fps / frame_count columns hold the
+       MEASURED values whenever a measurement exists (backend-reported values
+       only as a fallback). Why: a pinned fps / duration cannot be enforced
+       from what the backend claims. Migration: none; v1-v7 load with None,
+       and their fps / frame_count remain backend-reported.
 """
 
 from __future__ import annotations
@@ -51,8 +60,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ai_studio.media import Resolution  # re-exported: Phase 0-1A import path
+from ai_studio.media_probe import OUTPUT_MEDIA_KEYS
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 STATUSES = ("success", "failed")
 TASK_TYPES = ("video_generation", "video_editing")  # = Capability values
@@ -118,8 +128,11 @@ class BenchmarkResult:
     # Output. Project-relative POSIX path when inside the project root.
     output_video: str | None = None
     resolution: Resolution
-    fps: float | None = None  # None when unknown
-    frame_count: int | None = None  # None when unknown
+    # v8+: measured when output_media is set, else backend-reported. None when unknown.
+    fps: float | None = None
+    frame_count: int | None = None
+    # v8+: measured output video, see OUTPUT_MEDIA_KEYS. Successful runs only.
+    output_media: dict[str, Any] | None = None
 
     # Hardware and cost
     gpu: str | None = None
@@ -194,6 +207,11 @@ class BenchmarkResult:
                 not self.start_frame["sha256"] or self.start_frame["effective_width"] is None
             ):
                 raise ValueError("successful start-frame run must record sha256 and effective dimensions")
+        if self.output_media is not None:
+            if not isinstance(self.output_media, dict) or set(self.output_media) != set(OUTPUT_MEDIA_KEYS):
+                raise ValueError(f"output_media must be a dict with keys {OUTPUT_MEDIA_KEYS}")
+            if self.status != "success":
+                raise ValueError("only a successful run may have output_media")
         for name in ("model_parameters", "environment", "input_checksums", "task_parameters"):
             if not isinstance(getattr(self, name), dict):
                 raise ValueError(f"{name} must be a dict")

@@ -17,6 +17,24 @@ into the record.
 Stages: validation -> prepare -> generation -> verification -> logging.
 Each stage is timed separately (prepare = cold start, generation = inference).
 
+Verification checks that the output is a file inside the run's output
+directory, that no input was modified and that start-frame conditioning was
+reported honestly. Then it MEASURES the output video with `media_probe`
+(default: ffprobe) instead of trusting the backend's fps / frame_count.
+Verification fails when:
+  - no probe is available but the request pins fps or a duration tolerance
+    ("cannot verify"); without such pins it is only a warning
+  - backend-reported fps differs from the measured fps by more than 0.01
+  - backend-reported frame_count differs from the measured frame count
+  - the request's fps differs from the measured fps by more than 0.01
+  - duration_seconds and duration_tolerance_seconds are set and the measured
+    duration (frame_count / fps) is further from duration_seconds than that
+A measured resolution different from output_resolution is only a warning.
+The record stores the measurement in output_media, and its fps / frame_count
+columns hold the measured values (backend-reported only when nothing was
+measured). Runner warnings go into notes as "warning: ...". These checks use
+only generic request fields; the runner stays model-agnostic.
+
 Failed runs are benchmark data: if a stage raises, a record with
 status="failed" is written (whenever that is possible without overwriting
 anything) and BenchmarkRunError is raised, chained to the original exception.
@@ -54,9 +72,11 @@ from ai_studio.generation.capabilities import UnsupportedCapabilityError
 from ai_studio.generation.request import VideoGenerationRequest
 from ai_studio.generation.result import GenerationResult
 from ai_studio.media import image_dimensions
+from ai_studio.media_probe import ProbeUnavailableError, VideoInfo, ffprobe_video
 from ai_studio.paths import project_root, resolve_path, to_project_relative
 
 MAX_ERROR_MESSAGE_CHARS = 4000
+FPS_TOLERANCE = 0.01  # 23.976 != 24
 
 TaskRequest = BenchmarkRequest | VideoGenerationRequest
 
@@ -102,6 +122,8 @@ class _Run:
     result: GenerationResult | None = None
     checksums: dict[str, str] = dataclasses.field(default_factory=dict)
     timings: dict[str, float] = dataclasses.field(default_factory=dict)
+    media: VideoInfo | None = None  # measured output; None if not measured
+    warnings: list[str] = dataclasses.field(default_factory=list)  # runner's own
 
 
 class BenchmarkRunner:
@@ -111,11 +133,13 @@ class BenchmarkRunner:
         outputs_dir: str | Path,
         environment_collector: Callable[[], dict[str, Any]] = collect_environment,
         root: str | Path | None = None,
+        media_probe: Callable[[Path], VideoInfo] = ffprobe_video,
     ) -> None:
         self.root = Path(root).resolve() if root is not None else project_root()
         self.logger = logger
         self.outputs_dir = resolve_path(outputs_dir, self.root)
         self.environment_collector = environment_collector
+        self.media_probe = media_probe
 
     def run_definition(
         self,
@@ -207,6 +231,7 @@ class BenchmarkRunner:
 
             enter("verification")
             self._verify(run.result, output_dir, resolved, run.checksums, self.root)
+            run.media = self._measure_output(run.result, resolved, run.warnings)
             enter("done")
         except BackendNotInstalledError:
             raise
@@ -280,6 +305,49 @@ class BenchmarkRunner:
         elif conditioning is not None:
             raise RuntimeError("backend reported start-frame conditioning for a request without start_frame")
 
+    def _measure_output(
+        self, result: GenerationResult, request: TaskRequest, warnings: list[str],
+    ) -> VideoInfo | None:
+        """Measure the output video and check it against the backend's claims
+        and the request's pinned values. Appends non-fatal findings to `warnings`."""
+        requested_fps = getattr(request, "fps", None)
+        duration = getattr(request, "duration_seconds", None)
+        tolerance = getattr(request, "duration_tolerance_seconds", None)
+        try:
+            info = self.media_probe(resolve_path(result.output_video, self.root))
+        except ProbeUnavailableError as exc:
+            if requested_fps is not None or tolerance is not None:
+                raise ProbeUnavailableError(
+                    f"cannot verify the requested fps/duration without a media probe: {exc}"
+                ) from exc
+            warnings.append(f"output video not measured ({exc}); fps/frame_count are backend-reported")
+            return None
+        if not isinstance(info, VideoInfo):
+            raise TypeError(f"media probe returned {type(info).__name__}, expected VideoInfo")
+
+        if result.fps is not None and abs(result.fps - info.fps) > FPS_TOLERANCE:
+            raise RuntimeError(f"backend reported fps {result.fps:g}, measured {info.fps:g}")
+        if result.frame_count is not None and result.frame_count != info.frame_count:
+            raise RuntimeError(
+                f"backend reported {result.frame_count} frames, measured {info.frame_count}"
+            )
+        if requested_fps is not None and abs(info.fps - requested_fps) > FPS_TOLERANCE:
+            raise RuntimeError(f"requested fps {requested_fps:g}, measured {info.fps:g}")
+        if duration is not None and tolerance is not None:
+            # Tiny epsilon so a tolerance that is hit exactly is not lost to float rounding.
+            if abs(info.duration_seconds - duration) > tolerance + 1e-9:
+                raise RuntimeError(
+                    f"measured duration {info.duration_seconds:.3f}s ({info.frame_count} frames "
+                    f"at {info.fps:g} fps) is not within {tolerance:g}s of the requested {duration:g}s"
+                )
+        target = request.output_resolution
+        if (info.width, info.height) != (target.width, target.height):
+            warnings.append(
+                f"measured resolution {info.width}x{info.height} differs from requested "
+                f"{target.width}x{target.height}"
+            )
+        return info
+
     def _collect_environment(self) -> dict[str, Any]:
         try:
             return dict(self.environment_collector())
@@ -295,6 +363,7 @@ class BenchmarkRunner:
         note_lines = [run.notes]
         if valid_result:
             note_lines += [f"warning: {w}" for w in valid_result.warnings]
+            note_lines += [f"warning: {w}" for w in run.warnings]
             for key, requested in request.backend_parameters.items():
                 if key in effective and effective[key] != requested:
                     note_lines.append(
@@ -336,8 +405,13 @@ class BenchmarkRunner:
             input_checksums={to_project_relative(p, self.root): h for p, h in run.checksums.items()},
             start_frame=self._start_frame_record(run, valid_result),
             resolution=request.output_resolution,
-            fps=valid_result.fps if valid_result else None,
-            frame_count=valid_result.frame_count if valid_result else None,
+            # Measured when available (only on success), else backend-reported.
+            output_media=run.media.to_record() if run.media and not failure else None,
+            fps=run.media.fps if run.media else (valid_result.fps if valid_result else None),
+            frame_count=(
+                run.media.frame_count if run.media
+                else (valid_result.frame_count if valid_result else None)
+            ),
             gpu=environment.get("gpu_model"),
             vram_gb=environment.get("vram_gb"),
             validation_time_seconds=run.timings.get("validation"),

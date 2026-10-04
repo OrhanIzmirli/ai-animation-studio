@@ -8,7 +8,9 @@
 Phase 1A built the infrastructure: backend interface, request/result
 schemas, environment capture, runner, YAML benchmark definitions and the
 human evaluation schema. Phase 1B adds a second capability, **video
-generation**, beside video editing. No model is installed yet.
+generation**, beside video editing. Phase 1C makes the runner **measure** the
+output video instead of trusting the backend's reported fps / frame count. No
+model is installed yet.
 
 ## Two capabilities, benchmarked separately
 
@@ -43,12 +45,16 @@ canonical image itself is never modified; the input checksum check enforces
 this.
 
 Generation definitions may pin `fps`. A run-time `fps` that differs from the
-pinned value is rejected.
+pinned value is rejected. They may also pin `duration_tolerance_seconds`, the
+largest allowed difference between the measured duration and
+`duration_seconds`; it has no run-time override. Both are enforced on the
+measured output, see [Output verification](#output-verification-measured-not-reported).
 
 Generation definitions carry structured shot controls: `duration_seconds`,
 `camera_motion`, `subject_motion`, `visual_direction`. Each control is a
 generic string, list or mapping, never a model-specific field. They are
-recorded with every run in `task_parameters`. Run a generation definition
+recorded with every run in `task_parameters`, together with `requested_fps`
+and `duration_tolerance_seconds`. Run a generation definition
 with:
 
 ```python
@@ -134,7 +140,9 @@ model's own settings — and every value is recorded in `model_parameters`.
 
 backend and backend version, model and model version, workflow version, seed,
 prompt, negative prompt, input and reference paths plus checksums, output
-resolution, fps / frame count when the backend reports them, all effective
+resolution, the measured output video (`output_media`; `fps` / `frame_count`
+are the measured values, or the backend-reported ones when nothing could be
+measured), all effective
 backend parameters (requested values plus defaults the backend applied; any
 value the backend changed is noted), environment (OS, Python, git commit and
 dirty flag, GPU, VRAM, driver, CUDA, PyTorch, backend library versions),
@@ -147,6 +155,44 @@ Results are written to `benchmarks/results/<benchmark_id>/<run_id>.json`;
 existing files are never overwritten, and each run gets its own output
 directory `outputs/<benchmark_id>/<run_id>/`.
 
+### Output verification: measured, not reported
+
+After a backend returns, the verification stage checks that the output is a
+file inside the run's own output directory, that no input file was modified,
+and that start-frame conditioning was reported. It then **measures** the
+output video (`src/ai_studio/media_probe.py`):
+
+```
+ffprobe -v error -select_streams v:0 -count_frames
+  -show_entries stream=codec_name,width,height,avg_frame_rate,r_frame_rate,nb_read_frames -of json
+```
+
+`frame_count` is the number of frames actually decoded, `fps` comes from
+`avg_frame_rate`, and the duration is `frame_count / fps`, not the container
+duration.
+
+| Check | Result |
+|---|---|
+| ffprobe not installed, and the request pins `fps` or a `duration_tolerance_seconds` | **fail** ("cannot verify") |
+| ffprobe not installed, nothing pinned | warning in `notes`, `output_media: null`, backend-reported `fps` / `frame_count` kept |
+| backend-reported fps differs from measured by more than 0.01 | **fail** |
+| backend-reported frame count differs from measured | **fail** |
+| requested fps differs from measured by more than 0.01 (23.976 is not 24) | **fail** |
+| `duration_seconds` and `duration_tolerance_seconds` set, and the measured duration is further away than the tolerance | **fail**; the message gives measured seconds, frames and fps |
+| measured resolution differs from `output_resolution` | warning in `notes` only |
+| ffprobe runs but cannot read the file | **fail** |
+
+A failure here is a normal failed run with `failure_stage: verification`. On
+success the record's `output_media` holds
+`{probe, width, height, fps, frame_count, duration_seconds, codec}`, and the
+`fps` / `frame_count` columns hold the measured values. Runner warnings are
+written to `notes` as `warning: ...`. The checks use only generic request
+fields, so the runner stays model-agnostic; tests inject a fake probe through
+`BenchmarkRunner(media_probe=...)`.
+
+ffprobe (part of FFmpeg) must be on `PATH` to run any benchmark that pins fps
+or a duration tolerance.
+
 ### Failed runs are benchmark data
 
 A backend that runs out of VRAM, fails to load, crashes during inference,
@@ -158,7 +204,7 @@ backend. The runner therefore records failures too:
 | `validation` | missing input file, or the backend's `validate_inputs()` rejected the request |
 | `prepare` | model load (corrupt checkpoint, not enough memory to load, ...) |
 | `generation` | inference (CUDA OOM, exception, timeout raised by the backend) |
-| `verification` | output missing / outside its run directory / wrong type, or an input file was modified |
+| `verification` | output missing / outside its run directory / wrong type, an input file was modified, or the measured video contradicts the backend's report or the pinned fps / duration |
 | `logging` | the success record could not be written |
 
 A failed record has `status: failed`, `failure_stage`, `error_type` (fully
@@ -185,7 +231,7 @@ other generation failure.
 | `validation_time_seconds` | input checks, backend validation, input checksums |
 | `prepare_time_seconds` | model load / warm-up — the **cold-start cost** |
 | `generation_time_seconds` | inference only — the **actual inference cost** |
-| `verification_time_seconds` | output checks, input re-checksum |
+| `verification_time_seconds` | output checks, input re-checksum, measuring the output video |
 | `total_time_seconds` | whole run, excluding writing the record |
 
 `generation_time_seconds` keeps its original meaning (and name) for
@@ -264,6 +310,7 @@ added later with their defaults.
 | 5 | + `output_video`; `human_rating` deprecated | `output_video: null` |
 | 6 | + `task_type` (required), `task_parameters` | `task_type: null` (unknown), `task_parameters: {}` |
 | 7 | + `start_frame` (image-to-video reproducibility block) | `start_frame: null` |
+| 8 | + `output_media` (measured output video); `fps`/`frame_count` are measured values when a measurement exists | `output_media: null`; `fps`/`frame_count` stay backend-reported |
 
 v5 migration: no action is needed. From v5 on, a successful record **must**
 have `output_video`; the rule is checked only for records with
@@ -275,6 +322,11 @@ carry shot controls, so a record must say which task it was and keep those
 controls to be reproducible. `task_type` is required for records with
 `schema_version >= 6`. Older records keep `task_type: null`. v3–v5 runner
 records were all editing runs; v1–v2 were logged by hand.
+
+v8 migration: no action is needed. `output_media` is allowed only on
+successful records and must have exactly the keys in
+`ai_studio.media_probe.OUTPUT_MEDIA_KEYS`. In v1–v7 records `fps` and
+`frame_count` are whatever the backend reported and were never checked.
 
 Frozen example records for every version live in `tests/fixtures/schema/`
 and must keep loading. Never edit them; add a new fixture for a new version.

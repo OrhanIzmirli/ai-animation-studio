@@ -10,7 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from ai_studio.benchmarking import SCHEMA_VERSION, BenchmarkLogger, BenchmarkResult
+from ai_studio.benchmarking import SCHEMA_VERSION, BenchmarkLogger, BenchmarkResult, Resolution
+from ai_studio.media_probe import OUTPUT_MEDIA_KEYS
 
 FIXTURES = Path(__file__).parent / "fixtures" / "schema"
 
@@ -19,6 +20,7 @@ ALL_FIXTURES = [
     "v1", "v2", "v3", "v4_success", "v4_failed", "v5_success", "v5_failed",
     "v6_generation_success", "v6_editing_failed",
     "v7_image_to_video_success",
+    "v8_measured_output_success",
 ]
 
 
@@ -27,8 +29,8 @@ def load_fixture(name):
 
 
 def test_current_schema_version_has_a_fixture():
-    assert SCHEMA_VERSION == 7
-    assert (FIXTURES / "v7_image_to_video_success.json").is_file()
+    assert SCHEMA_VERSION == 8
+    assert (FIXTURES / "v8_measured_output_success.json").is_file()
 
 
 def test_v1_loads():
@@ -167,8 +169,50 @@ def test_v7_image_to_video_loads():
     assert record.start_frame["path"] not in record.reference_assets
 
 
+@pytest.mark.parametrize("name", ALL_FIXTURES[:10])
+def test_pre_v8_records_have_no_output_media(name):
+    assert load_fixture(name).output_media is None
+
+
+def test_v8_measured_output_loads():
+    record = load_fixture("v8_measured_output_success")
+    assert record.schema_version == 8
+    assert record.resolution == Resolution(width=1280, height=704)
+    # fps / frame_count columns hold the measured values
+    assert record.fps == record.output_media["fps"] == 24
+    assert record.frame_count == record.output_media["frame_count"] == 121
+    assert record.output_media["duration_seconds"] == 5.041667
+    assert record.output_media["probe"] == "ffprobe 6.1.1"
+    assert record.task_parameters["duration_tolerance_seconds"] == 0.1
+    assert set(record.output_media) == set(OUTPUT_MEDIA_KEYS)
+
+
+def test_output_media_missing_key_rejected():
+    data = json.loads((FIXTURES / "v8_measured_output_success.json").read_text(encoding="utf-8"))
+    del data["output_media"]["codec"]
+    with pytest.raises(ValueError, match="output_media"):
+        BenchmarkResult.from_dict(data)
+
+
+def test_output_media_extra_key_rejected():
+    data = json.loads((FIXTURES / "v8_measured_output_success.json").read_text(encoding="utf-8"))
+    data["output_media"]["bitrate"] = 1000
+    with pytest.raises(ValueError, match="output_media"):
+        BenchmarkResult.from_dict(data)
+
+
+def test_failed_run_with_output_media_rejected():
+    data = json.loads((FIXTURES / "v8_measured_output_success.json").read_text(encoding="utf-8"))
+    data.update(status="failed", failure_stage="verification", error_type="RuntimeError",
+                error_message="backend reported 120 frames, measured 121")
+    with pytest.raises(ValueError, match="output_media"):
+        BenchmarkResult.from_dict(data)
+    data["output_media"] = None
+    assert BenchmarkResult.from_dict(data).status == "failed"
+
+
 def test_current_records_roundtrip(tmp_path):
-    record = load_fixture("v7_image_to_video_success")
+    record = load_fixture("v8_measured_output_success")
     logger = BenchmarkLogger(tmp_path)
     logger.log(record)
     assert logger.load(record.benchmark_id, record.run_id) == record

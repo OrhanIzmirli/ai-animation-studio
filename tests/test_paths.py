@@ -11,7 +11,7 @@ from ai_studio.benchmarking import (
     load_definition,
     load_definitions,
 )
-from conftest import FAKE_ENVIRONMENT, FakeBackend
+from conftest import FAKE_ENVIRONMENT, FakeBackend, fake_probe
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -103,7 +103,7 @@ def test_same_definition_runs_identically_from_any_cwd(monkeypatch, tmp_path, cw
     backend = FakeBackend()
     runner = BenchmarkRunner(
         BenchmarkLogger("benchmarks/results"), "outputs",
-        environment_collector=lambda: dict(FAKE_ENVIRONMENT),
+        environment_collector=lambda: dict(FAKE_ENVIRONMENT), media_probe=fake_probe,
     )
     record = runner.run(request, backend, run_id="run-1")
 

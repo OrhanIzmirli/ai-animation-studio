@@ -4,7 +4,8 @@ A definition fixes WHAT is tested and declares its task_type explicitly:
   video_editing     source video + references + instruction -> BenchmarkRequest
   video_generation  prompt + references + shot controls     -> VideoGenerationRequest
 Per-run choices (seed, output resolution, fps, backend parameters) are
-supplied when it is turned into a request.
+supplied when it is turned into a request. A pinned fps and the
+duration_tolerance_seconds cannot be overridden per run.
 
 Lifecycle: every definition has a status, "draft" (the default) or "ready".
 Only ready definitions can be turned into requests or run. Changing
@@ -28,7 +29,12 @@ import yaml
 from ai_studio.benchmarking.request import BenchmarkRequest
 from ai_studio.benchmarking.schema import TASK_TYPES, Resolution, check_file_name_safe
 from ai_studio.generation.capabilities import Capability
-from ai_studio.generation.request import ShotControl, VideoGenerationRequest, check_shot_control
+from ai_studio.generation.request import (
+    ShotControl,
+    VideoGenerationRequest,
+    check_duration_tolerance,
+    check_shot_control,
+)
 from ai_studio.paths import definitions_dir, resolve_path
 
 
@@ -41,7 +47,8 @@ class DraftBenchmarkError(RuntimeError):
 
 EDITING_ONLY_FIELDS = ("source_video", "target_object", "preserve_regions")
 GENERATION_ONLY_FIELDS = (
-    "duration_seconds", "fps", "start_frame", "camera_motion", "subject_motion", "visual_direction",
+    "duration_seconds", "duration_tolerance_seconds", "fps", "start_frame",
+    "camera_motion", "subject_motion", "visual_direction",
 )
 
 
@@ -62,6 +69,7 @@ class BenchmarkDefinition:
 
     # video_generation only (shot controls: string, list of strings or mapping)
     duration_seconds: float | None = None
+    duration_tolerance_seconds: float | None = None  # max |measured - duration_seconds|
     fps: float | None = None
     start_frame: str | None = None  # conditions frame 0; never also a reference image
     camera_motion: ShotControl = None
@@ -94,6 +102,7 @@ class BenchmarkDefinition:
             not isinstance(self.fps, (int, float)) or isinstance(self.fps, bool) or self.fps <= 0
         ):
             raise ValueError("fps must be a positive number")
+        check_duration_tolerance(self.duration_tolerance_seconds)
         if self.start_frame is not None:
             if not isinstance(self.start_frame, str) or not self.start_frame:
                 raise ValueError("start_frame must be a non-empty path")
@@ -150,6 +159,7 @@ class BenchmarkDefinition:
             start_frame=self.start_frame,
             reference_images=list(self.reference_images),
             duration_seconds=self.duration_seconds,
+            duration_tolerance_seconds=self.duration_tolerance_seconds,
             fps=self.fps if self.fps is not None else fps,
             output_resolution=output_resolution,
             seed=seed,

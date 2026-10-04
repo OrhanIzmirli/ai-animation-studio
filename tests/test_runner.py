@@ -8,7 +8,7 @@ import pytest
 from ai_studio.benchmarking import BenchmarkLogger, BenchmarkResult, BenchmarkRunError, BenchmarkRunner
 from ai_studio.benchmarking.runner import sha256_file
 from ai_studio.generation.backends import BackendNotInstalledError, KiwiEditBackend
-from conftest import FAKE_ENVIRONMENT, FailingBackend, FakeBackend, OutOfMemoryError
+from conftest import FAKE_ENVIRONMENT, FailingBackend, FakeBackend, OutOfMemoryError, fake_probe
 
 BENCH = "object_replacement_01"
 
@@ -232,7 +232,7 @@ def test_logging_failure_is_recorded(project, request_factory):
     # the failed-run record is forced to plain JSON and does get written.
     runner = BenchmarkRunner(
         BenchmarkLogger(project / "results"), "outputs",
-        environment_collector=lambda: {"handle": object()}, root=project,
+        environment_collector=lambda: {"handle": object()}, root=project, media_probe=fake_probe,
     )
     with pytest.raises(BenchmarkRunError) as exc_info:
         runner.run(request_factory(), FakeBackend())
@@ -255,7 +255,9 @@ def test_environment_collector_failure_does_not_break_run(project, request_facto
     def broken_collector():
         raise RuntimeError("probe crashed")
 
-    runner = BenchmarkRunner(BenchmarkLogger(project / "results"), "outputs", broken_collector, root=project)
+    runner = BenchmarkRunner(
+        BenchmarkLogger(project / "results"), "outputs", broken_collector, root=project, media_probe=fake_probe,
+    )
     record = runner.run(request_factory(), FakeBackend())
     assert record.status == "success"
     assert "probe crashed" in record.environment["collection_error"]

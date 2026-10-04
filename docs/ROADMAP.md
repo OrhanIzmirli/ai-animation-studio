@@ -8,10 +8,17 @@ benchmark it.
 Project layout, benchmark result schema, JSON benchmark logger, placeholder
 quality config, tests, documentation. No AI models.
 
-## Phase 1 — Maximum-quality video generation benchmark *(current: 1A)*
-- **1A** — model-agnostic benchmark infrastructure (backend interface, runner,
-  YAML definitions, human evaluation schema). No models installed.
-  See [PHASE_1_BENCHMARK.md](PHASE_1_BENCHMARK.md).
+## Phase 1 — Maximum-quality video generation benchmark *(current: 1C)*
+- **1A** *(done)* — model-agnostic benchmark infrastructure (backend
+  interface, runner, YAML definitions, human evaluation schema).
+- **1B** *(done)* — video generation as a second capability beside editing;
+  image-to-video start frames; first comic benchmark
+  ([BENCHMARK_COMIC_ROOFTOP_01.md](BENCHMARK_COMIC_ROOFTOP_01.md)).
+- **1C** *(current)* — the runner measures the output video (ffprobe) and
+  enforces pinned fps and duration instead of trusting backend-reported
+  values. No models installed yet.
+
+See [PHASE_1_BENCHMARK.md](PHASE_1_BENCHMARK.md).
 
 Integrate a first generation backend behind a replaceable interface. Establish
 reproducible baseline runs and log every run with full parameters. Optimise

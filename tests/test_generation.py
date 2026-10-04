@@ -16,7 +16,7 @@ from ai_studio.generation.backends import (
 from ai_studio.generation.capabilities import Capability, UnsupportedCapabilityError
 from ai_studio.generation.request import VideoGenerationRequest
 from ai_studio.generation.result import GenerationResult
-from conftest import FAKE_ENVIRONMENT, FakeBackend, FakeGenerationBackend, OutOfMemoryError
+from conftest import FAKE_ENVIRONMENT, FakeBackend, FakeGenerationBackend, OutOfMemoryError, fake_video_bytes
 
 BENCH = "comic_rooftop_01"
 
@@ -41,6 +41,7 @@ def test_generation_request_structured_shot_controls(generation_request_factory)
     assert request.task_parameters() == {
         "duration_seconds": 5,
         "requested_fps": 24,
+        "duration_tolerance_seconds": None,
         "camera_motion": "slow push-in",
         "subject_motion": ["mostly stationary", "slight head turn"],
         "visual_direction": {"style": "graphic novel", "line": "strong ink contours"},
@@ -82,7 +83,8 @@ def test_generation_request_has_no_model_specific_fields():
 
     names = {f.name for f in fields(VideoGenerationRequest)}
     assert names == {
-        "prompt", "negative_prompt", "start_frame", "reference_images", "duration_seconds", "fps",
+        "prompt", "negative_prompt", "start_frame", "reference_images", "duration_seconds",
+        "duration_tolerance_seconds", "fps",
         "output_resolution", "seed", "backend_parameters",
         "camera_motion", "subject_motion", "visual_direction",
     }
@@ -144,7 +146,8 @@ class MultiCapabilityBackend(VideoGenerationBackend, VideoEditingBackend):
     def generate(self, request, output_dir):
         kind = "edit" if isinstance(request, BenchmarkRequest) else "gen"
         output = Path(output_dir) / f"{kind}.mp4"
-        output.write_bytes(kind.encode())
+        res = request.output_resolution
+        output.write_bytes(fake_video_bytes(res.width, res.height, 24, 81))
         return GenerationResult(
             output_video=str(output), backend_name="multi", backend_version="1",
             model_name="multi-model", model_version="1",
@@ -188,7 +191,7 @@ def test_generation_run_records_everything(runner, generation_request_factory, i
     )
 
     data = json.loads(runner.logger.path_for(BENCH, "run-1").read_text(encoding="utf-8"))
-    assert data["schema_version"] == 7
+    assert data["schema_version"] == 8
     assert data["task_type"] == "video_generation"
     assert data["start_frame"] is None  # text/reference-to-video, no start frame
     assert data["status"] == "success"
@@ -199,6 +202,7 @@ def test_generation_run_records_everything(runner, generation_request_factory, i
     assert data["task_parameters"] == {
         "duration_seconds": 5,
         "requested_fps": 24,
+        "duration_tolerance_seconds": None,
         "camera_motion": "slow push-in",
         "subject_motion": ["mostly stationary", "slight head turn"],
         "visual_direction": {"style": "graphic novel", "line": "strong ink contours"},
