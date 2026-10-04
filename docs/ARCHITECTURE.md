@@ -46,12 +46,16 @@ carry `task_type`.
 | Backend | Capability | State |
 |---|---|---|
 | `WanTI2V5BBackend` (`wan_ti2v.py`) | generation, image-to-video (start frame) | implemented; needs the `wan` extra and a CUDA GPU. See [BACKEND_WAN_TI2V_5B.md](BACKEND_WAN_TI2V_5B.md) |
+| `WanTurboComfyUIBackend` (`wan_turbo_comfyui.py`) | generation, image-to-video (start frame) | implemented; a different model (Turbo finetune, GGUF) run through a local ComfyUI that the adapter starts and stops. Works on an 8 GB GPU. See [BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md](BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md) |
 | `JoyAIVideoEditBackend` (`joyai.py`) | editing | placeholder, not installed |
 | `KiwiEditBackend` (`kiwi.py`) | editing | placeholder, not installed |
 | `WanEditCtrlBackend` (`wan_editctrl.py`) | editing | placeholder, not installed |
 
 An adapter imports its heavy dependencies only when it is prepared, so the
 package and the test suite work on a machine without any model installed.
+An adapter may also drive an external program instead: the ComfyUI adapter
+speaks HTTP to a ComfyUI installed outside the repository, whose location
+comes from a git-ignored local config file (`configs/comfyui.local.yaml`).
 
 Names are mapped to adapter classes in one place,
 `src/ai_studio/generation/backends/registry.py` (`BACKENDS`, `get_backend`).

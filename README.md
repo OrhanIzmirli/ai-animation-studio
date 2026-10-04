@@ -36,6 +36,8 @@ See [docs/PHASE_1_BENCHMARK.md](docs/PHASE_1_BENCHMARK.md).
 
 Running a benchmark on a cloud GPU (Camber, free L4 node), step by step from
 Windows: [docs/RUNNING_ON_CAMBER.md](docs/RUNNING_ON_CAMBER.md).
+Running locally on an 8 GB GPU with the Turbo model through ComfyUI:
+[docs/BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md](docs/BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md).
 Automatic video metrics (measurements only, no thresholds yet):
 [docs/QUALITY_METRICS.md](docs/QUALITY_METRICS.md).
 
@@ -71,7 +73,9 @@ benchmarks/
   evaluations/    human ratings (editing), one file per evaluator and revision
   comic_evaluations/  experimental comic ratings (generation)
   metrics/        automatic video metrics, one file per run and metrics version
-configs/          configuration (quality thresholds, later backends)
+configs/          configuration (quality thresholds; comfyui.example.yaml for the
+                  local ComfyUI backend, copied to a git-ignored *.local.yaml)
+spikes/           throwaway feasibility experiments and their reports
 scripts/          run_benchmark.py (CLI), make_bundle / collect_run / import_run,
                   camber_setup / camber_run
 requirements/     exact package pins per cloud environment

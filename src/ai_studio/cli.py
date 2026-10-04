@@ -2,6 +2,12 @@
 
     python scripts/run_benchmark.py --benchmark comic_rooftop_01 --backend wan-ti2v-5b
         --seed 42 --width 1280 --height 704 [--param key=value ...] [--notes TEXT]
+        [--no-metrics]
+
+After a successful run the automatic quality metrics are computed and stored
+(benchmarks/metrics/...). That step is not part of the run: if it fails, a
+warning is printed and the exit code stays 0, because the run record is
+already saved. --no-metrics skips it.
 
 Exit codes:
     0  the run succeeded and was recorded
@@ -38,7 +44,15 @@ from ai_studio.generation.backends import BackendNotInstalledError
 from ai_studio.generation.backends.registry import get_backend
 from ai_studio.generation.capabilities import UnsupportedCapabilityError
 from ai_studio.media_probe import VideoInfo, ffprobe_video
-from ai_studio.paths import definitions_dir, outputs_dir, project_root, results_dir, to_project_relative
+from ai_studio.paths import (
+    definitions_dir,
+    metrics_dir,
+    outputs_dir,
+    project_root,
+    results_dir,
+    to_project_relative,
+)
+from ai_studio.quality.store import VideoMetricsStore
 
 EXIT_SUCCESS, EXIT_FAILED_RUN, EXIT_SETUP = 0, 1, 2
 
@@ -81,6 +95,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--notes", default="", help="free text stored in the record")
     parser.add_argument("--run-id", default=None, help="default: a new timestamped id")
+    parser.add_argument(
+        "--no-metrics", action="store_true",
+        help="do not compute the automatic quality metrics after a successful run",
+    )
     return parser
 
 
@@ -94,12 +112,14 @@ def run_benchmark(
     parameters: dict[str, Any] | None = None,
     notes: str = "",
     run_id: str | None = None,
+    metrics: bool = True,
     media_probe: Callable[[Path], VideoInfo] | None = None,
     out: Callable[[str], None] = print,
 ) -> tuple[int, list[str]]:
     """Run one benchmark. Returns (exit_code, written project-relative paths):
-    the record file and, if it exists, the run's output directory. The list
-    is empty when nothing was recorded."""
+    the record file, the run's output directory if it exists and, after a
+    successful run with `metrics`, the metrics file. The list is empty when
+    nothing was recorded."""
     try:
         check_file_name_safe("benchmark", benchmark)
         root = project_root()
@@ -121,10 +141,16 @@ def run_benchmark(
     out(f"benchmark: {definition.benchmark_id}   backend: {backend}   seed: {seed}   "
         f"resolution: {width}x{height}   run_id: {run_id}")
     try:
-        record = runner.run_definition(
-            definition, backend_instance, seed=seed, output_resolution=resolution,
-            backend_parameters=dict(parameters or {}), run_id=run_id, notes=notes,
-        )
+        try:
+            record = runner.run_definition(
+                definition, backend_instance, seed=seed, output_resolution=resolution,
+                backend_parameters=dict(parameters or {}), run_id=run_id, notes=notes,
+            )
+        finally:
+            # A backend that started something (e.g. a local server) stops it here.
+            close = getattr(backend_instance, "close", None)
+            if callable(close):
+                close()
     except BenchmarkRunError as exc:
         cause = exc.__cause__
         out(f"status: failed (stage: {exc.stage})")
@@ -151,7 +177,33 @@ def run_benchmark(
     for line in record.notes.splitlines():
         if line.startswith("warning: "):
             out(line)
-    return EXIT_SUCCESS, _written_paths(logger, definition.benchmark_id, run_id, root, out)
+    written = _written_paths(logger, definition.benchmark_id, run_id, root, out)
+    if metrics:
+        written += _measure(logger, definition.benchmark_id, run_id, root, out)
+    return EXIT_SUCCESS, written
+
+
+def _measure(
+    logger: BenchmarkLogger, benchmark_id: str, run_id: str, root: Path, out: Callable[[str], None],
+) -> list[str]:
+    """Compute and store the quality metrics of a finished run. Never fatal:
+    the run record is already saved."""
+    store = VideoMetricsStore(metrics_dir(root), logger)
+    try:
+        measured = store.measure_run(benchmark_id, run_id, root)
+    except Exception as exc:  # metrics are an extra; any failure is only reported
+        out(f"warning: quality metrics were not computed: {type(exc).__name__}: {exc}")
+        return []
+    values = measured.metrics
+    psnr = values.get("start_frame_psnr")
+    out(f"metrics v{measured.metrics_version}: motion_mean {values['motion_mean']:.3f}, "
+        f"total_change {values['total_change']:.3f}, "
+        f"start_frame_psnr {'n/a' if psnr is None else f'{psnr:.2f} dB'}, "
+        f"pulse_ratio {'n/a' if values['temporal_pulse_ratio'] is None else format(values['temporal_pulse_ratio'], '.2f')}, "
+        f"luminance_flicker {values['luminance_flicker']:.3f}, held_frame_ratio {values['held_frame_ratio']:.3f}")
+    path = to_project_relative(store.path_for(benchmark_id, run_id, measured.metrics_version), root)
+    out(f"metrics: {path}")
+    return [path]
 
 
 def _setup_problem(exc: BaseException, out: Callable[[str], None]) -> tuple[int, list[str]]:
@@ -197,6 +249,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     code, _ = run_benchmark(
         benchmark=args.benchmark, backend=args.backend, seed=args.seed, width=args.width,
         height=args.height, parameters=parameters, notes=args.notes, run_id=args.run_id,
+        metrics=not args.no_metrics,
     )
     return code
 

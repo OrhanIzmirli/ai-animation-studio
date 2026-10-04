@@ -151,6 +151,11 @@ run                        steps  motion_mean  total_change  start_psnr  pulse_r
 20261004T145422Z-a264ad6e  2      0.689        4.150         41.66       2.41         0.250    0.058       measured
 ```
 
+`scripts/run_benchmark.py` does this automatically after every successful
+run (`--no-metrics` skips it). A failure there only prints a warning: the run
+record is already saved. `measure_run.py` remains for runs made elsewhere or
+before this existed.
+
 Runs that already have metrics are shown with `already measured` and not
 measured again; failed runs and runs whose video is not on this machine are
 listed as skipped. Commit the new `benchmarks/metrics/...json` files like run
@@ -161,4 +166,5 @@ records.
 - thresholds, pass/fail, any combined score
 - anything semantic: identity, line stability, style, artifacts
 - locating a defect in space (region) rather than only in time
-- use by the runner: metrics are computed after the fact, on demand
+- use by the runner: metrics are computed after the run, by the CLI or on
+  demand, never inside `BenchmarkRunner`

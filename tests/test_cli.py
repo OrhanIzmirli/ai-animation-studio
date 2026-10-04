@@ -18,6 +18,7 @@ from ai_studio.generation.backends import (
     VideoBackend,
     WanEditCtrlBackend,
     WanTI2V5BBackend,
+    WanTurboComfyUIBackend,
     get_backend,
 )
 from ai_studio.generation.backends import registry
@@ -41,6 +42,7 @@ duration_tolerance_seconds: 0.1
 def test_registry_lists_every_backend_by_its_backend_name():
     assert BACKENDS == {
         "wan-ti2v-5b": WanTI2V5BBackend,
+        "wan-ti2v-5b-turbo-comfyui": WanTurboComfyUIBackend,
         "joyai-video-edit": JoyAIVideoEditBackend,
         "kiwi-edit": KiwiEditBackend,
         "wan2.2-vace-fun-a14b-editctrl": WanEditCtrlBackend,

@@ -1,0 +1,38 @@
+# Local ComfyUI installation used by the "wan-ti2v-5b-turbo-comfyui" backend.
+#
+# Copy this file to configs/comfyui.local.yaml (git-ignored) and adjust
+# comfyui_dir. Alternatively point $AI_STUDIO_COMFYUI_CONFIG at a config file.
+# Setup instructions: docs/BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md
+
+# The ComfyUI checkout (the folder that contains main.py). Installed outside
+# this repository.
+comfyui_dir: C:/path/to/ComfyUI
+
+# Python that runs ComfyUI. Leave empty for <comfyui_dir>/venv
+# (venv/Scripts/python.exe on Windows, venv/bin/python elsewhere).
+python:
+
+# The adapter starts ComfyUI on 127.0.0.1:<port>, or reuses one that already
+# answers there.
+port: 8188
+startup_timeout_seconds: 300
+generation_timeout_seconds: 3600
+
+# File names inside <comfyui_dir>/models/ (diffusion_models or unet,
+# text_encoders or clip, vae).
+models:
+  unet: Wan2_2-TI2V-5B-Turbo-Q8_0.gguf
+  text_encoder: umt5_xxl_fp8_e4m3fn_scaled.safetensors
+  vae: wan2.2_vae.safetensors
+
+# Expected SHA-256 of each file. Verified before every run; a file that does
+# not match is refused. These are the files measured in
+# spikes/LOCAL_COMFYUI_SPIKE.md. Remove an entry to accept any file (its hash
+# is still recorded with the run).
+sha256:
+  unet: b4d7d1888d5ec2c29046cc443239faad99614cd3d356c61d8192fcac5f4c98fc
+  text_encoder: c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68
+  vae: e40321bd36b9709991dae2530eb4ac303dd168276980d3e9bc4b6e2b75fed156
+
+# Extra arguments for ComfyUI's main.py, e.g. ["--reserve-vram", "1"].
+extra_args: []

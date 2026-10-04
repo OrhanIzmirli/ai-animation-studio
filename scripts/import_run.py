@@ -6,8 +6,8 @@ Windows.
 Every file is created at the same project-relative path it has in the zip
 (benchmarks/results/..., outputs/...). Nothing is ever overwritten: if any
 target already exists, nothing at all is written. Entries that would land
-outside the project, or anywhere other than the results and outputs folders,
-are rejected. Standard library only.
+outside the project, or anywhere other than the results, metrics and outputs
+folders, are rejected. Standard library only.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import sys
 import zipfile
 from pathlib import Path
 
-ALLOWED_PREFIXES = ("benchmarks/results/", "outputs/")
+ALLOWED_PREFIXES = ("benchmarks/results/", "benchmarks/metrics/", "outputs/")
 
 
 class ImportRunError(RuntimeError):

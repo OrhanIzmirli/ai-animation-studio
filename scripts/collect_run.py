@@ -1,5 +1,5 @@
-"""Zip one benchmark run (record + output directory) for download. Run on the
-machine that produced the run.
+"""Zip one benchmark run (record + output directory + metrics, if any) for
+download. Run on the machine that produced the run.
 
     python3 scripts/collect_run.py --benchmark B [--run-id R]
 
@@ -66,6 +66,9 @@ def collect_run(root: Path, benchmark: str, run_id: str | None = None) -> Path:
     files = [record]
     if output_dir.is_dir():  # a run that failed before generation has none
         files += sorted(path for path in output_dir.rglob("*") if path.is_file())
+    metrics_dir = root / "benchmarks" / "metrics" / benchmark / run_id
+    if metrics_dir.is_dir():  # written by the CLI after a successful run
+        files += sorted(path for path in metrics_dir.rglob("*") if path.is_file())
 
     archive_path = root / "dist" / f"run-{benchmark}-{run_id}.zip"
     archive_path.parent.mkdir(exist_ok=True)

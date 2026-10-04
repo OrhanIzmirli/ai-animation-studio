@@ -25,6 +25,11 @@ quality config, tests, documentation. No AI models.
   memory, then a diffusers 0.35.2 tiling bug; fixed by pinning 0.36.0).
   The first successful run is a 2-step smoke run (20261004T145422Z-a264ad6e);
   no full-quality baseline exists yet. Next: the first 50-step run.
+  A second generation backend runs locally: the Turbo finetune of the same
+  model as GGUF through ComfyUI, 4.6 minutes per clip on an RTX 4060 laptop
+  ([BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md](BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md);
+  spike report in `spikes/`). The CLI now stores the automatic quality
+  metrics after every successful run.
 
 See [PHASE_1_BENCHMARK.md](PHASE_1_BENCHMARK.md).
 

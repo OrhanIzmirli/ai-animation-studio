@@ -201,6 +201,22 @@ def test_collect_then_import_round_trip(tmp_path):
     assert tree(local) == tree(cloud)
 
 
+def test_metrics_file_travels_with_the_run(tmp_path):
+    cloud, local = tmp_path / "cloud", tmp_path / "local"
+    local.mkdir()
+    write_run(cloud, "bench", "run-1")
+    metrics = cloud / "benchmarks" / "metrics" / "bench" / "run-1" / "metrics_v1.json"
+    metrics.parent.mkdir(parents=True)
+    metrics.write_text('{"metrics_version": "1"}', encoding="utf-8")
+    (cloud / "benchmarks" / "metrics" / "bench" / "other-run").mkdir()  # not ours: stays behind
+
+    archive = collect_run.collect_run(cloud, "bench", "run-1")
+    with zipfile.ZipFile(archive) as z:
+        assert "benchmarks/metrics/bench/run-1/metrics_v1.json" in z.namelist()
+    assert "benchmarks/metrics/bench/run-1/metrics_v1.json" in import_run.import_run(archive, local)
+    assert (local / "benchmarks/metrics/bench/run-1/metrics_v1.json").read_text() == '{"metrics_version": "1"}'
+
+
 def test_collect_defaults_to_the_newest_run(tmp_path):
     write_run(tmp_path, "bench", "zzz-old", timestamp="2026-10-01T10:00:00+00:00")
     write_run(tmp_path, "bench", "aaa-new", timestamp="2026-10-04T10:00:00+00:00")

@@ -59,6 +59,9 @@ benchmarks/references/**
 !benchmarks/references/**/.gitkeep
 !benchmarks/references/**/README.md
 
+# Local machine configuration (paths to tools installed outside the repo).
+configs/*.local.yaml
+
 # Spike outputs (frames, videos, logs); spike scripts and reports are tracked.
 spikes/output/
 
