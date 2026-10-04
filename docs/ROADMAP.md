@@ -20,8 +20,10 @@ quality config, tests, documentation. No AI models.
   ([BACKEND_WAN_TI2V_5B.md](BACKEND_WAN_TI2V_5B.md)), tested with an injected
   pipeline. Command-line launcher (`scripts/run_benchmark.py`) and a
   workflow for the free Camber L4 GPU node
-  ([RUNNING_ON_CAMBER.md](RUNNING_ON_CAMBER.md)). Next: the first run on a
-  GPU; no baseline results exist yet.
+  ([RUNNING_ON_CAMBER.md](RUNNING_ON_CAMBER.md)). The first two runs on the
+  L4 loaded the model and denoised, then failed in the VAE decode (out of
+  memory, then a diffusers 0.35.2 tiling bug; fixed by pinning 0.36.0).
+  Next: the first successful run; no baseline results exist yet.
 
 See [PHASE_1_BENCHMARK.md](PHASE_1_BENCHMARK.md).
 

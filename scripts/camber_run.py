@@ -3,8 +3,15 @@ notebook cell, e.g.:
 
     python3 scripts/camber_run.py --seed 42
 
-Defaults: benchmark comic_rooftop_01, backend wan-ti2v-5b, 1280x704,
-cpu_offload=true (the model does not fit in the L4's 24 GB otherwise).
+Defaults: benchmark comic_rooftop_01, backend wan-ti2v-5b, 1280x704, and
+what the L4 (22 GiB usable) needs: cpu_offload=true, vae_tiling=true and
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True. Each can be overridden
+(--param vae_tiling=false; set PYTORCH_CUDA_ALLOC_CONF yourself beforehand).
+
+    python3 scripts/camber_run.py --seed 42 --smoke
+
+runs only 2 denoising steps and marks the run "SMOKE TEST - not for
+evaluation": do this first in every GPU session, then the full run.
 
 What it does:
   1. prints nvidia-smi; refuses to start (exit 2) when no GPU is visible
@@ -33,7 +40,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 HOME_DIR = Path("/home/jovyan")
 ENV_PYTHON = HOME_DIR / "envs" / "ai-studio" / "bin" / "python"
 HF_HOME = HOME_DIR / "hf"
-DEFAULT_PARAMS = {"cpu_offload": "true"}
+# Without offload the model does not fit; without tiling the VAE decode runs
+# out of memory (measured on the L4: OOM at 18.34 GiB allocated).
+DEFAULT_PARAMS = {"cpu_offload": "true", "vae_tiling": "true"}
+DEFAULT_ALLOC_CONF = "expandable_segments:True"
+SMOKE_PARAMS = {"num_inference_steps": "2"}
+SMOKE_NOTE = "SMOKE TEST - not for evaluation"
 EXIT_SETUP = 2
 
 
@@ -71,9 +83,23 @@ def new_run_id() -> str:
     return f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:8]}"
 
 
-def build_command(args: argparse.Namespace, run_id: str, project_root: Path) -> list[str]:
+def effective_params(args: argparse.Namespace) -> list[str]:
+    """key=value backend parameters: defaults (plus the smoke-test ones) that
+    the caller did not set, then the caller's own."""
     given = {param.partition("=")[0].strip() for param in args.param}
-    params = [f"{key}={value}" for key, value in DEFAULT_PARAMS.items() if key not in given] + args.param
+    defaults = {**DEFAULT_PARAMS, **(SMOKE_PARAMS if args.smoke else {})}
+    return [f"{key}={value}" for key, value in defaults.items() if key not in given] + args.param
+
+
+def effective_notes(args: argparse.Namespace) -> str:
+    if not args.smoke:
+        return args.notes
+    return f"{SMOKE_NOTE}. {args.notes}" if args.notes else SMOKE_NOTE
+
+
+def build_command(args: argparse.Namespace, run_id: str, project_root: Path) -> list[str]:
+    params = effective_params(args)
+    notes = effective_notes(args)
     command = [
         str(ENV_PYTHON), "-u", str(project_root / "scripts" / "run_benchmark.py"),
         "--benchmark", args.benchmark, "--backend", args.backend, "--seed", str(args.seed),
@@ -81,19 +107,22 @@ def build_command(args: argparse.Namespace, run_id: str, project_root: Path) -> 
     ]
     for param in params:
         command += ["--param", param]
-    if args.notes:
-        command += ["--notes", args.notes]
+    if notes:
+        command += ["--notes", notes]
     return command
 
 
 def run_environment(project_root: Path) -> dict[str, str]:
-    return {
+    env = {
         **os.environ,
         "AI_STUDIO_ROOT": str(project_root),
         "HF_HOME": str(HF_HOME),
         "HF_HUB_OFFLINE": "1",  # weights are already in HF_HOME; never touch the network
         "PYTHONUNBUFFERED": "1",
     }
+    if not env.get("PYTORCH_CUDA_ALLOC_CONF"):  # the caller's own setting wins
+        env["PYTORCH_CUDA_ALLOC_CONF"] = DEFAULT_ALLOC_CONF
+    return env
 
 
 def collect(project_root: Path, benchmark: str, run_id: str) -> Path:
@@ -113,9 +142,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--height", type=int, default=704)
     parser.add_argument(
         "--param", action="append", default=[], metavar="KEY=VALUE",
-        help="backend parameter (repeatable); cpu_offload=true is added unless you set cpu_offload",
+        help="backend parameter (repeatable); cpu_offload=true and vae_tiling=true are added "
+             "unless you set them yourself",
     )
     parser.add_argument("--notes", default="")
+    parser.add_argument(
+        "--smoke", action="store_true",
+        help="quick end-to-end check: 2 denoising steps, marked as not for evaluation",
+    )
     return parser
 
 
@@ -137,8 +171,13 @@ def main(argv: list[str] | None = None, project_root: Path = PROJECT_ROOT) -> in
 
     run_id = new_run_id()
     command = build_command(args, run_id, project_root)
+    env = run_environment(project_root)
+    print("mode: " + ("SMOKE TEST (not for evaluation)" if args.smoke else "full run"))
+    print(f"backend parameters: {' '.join(effective_params(args))}")
+    for name in ("PYTORCH_CUDA_ALLOC_CONF", "HF_HOME", "HF_HUB_OFFLINE", "AI_STUDIO_ROOT"):
+        print(f"{name}={env[name]}")
     print("$ " + " ".join(command), flush=True)
-    code = stream(command, cwd=project_root, env=run_environment(project_root))
+    code = stream(command, cwd=project_root, env=env)
 
     record = project_root / "benchmarks" / "results" / args.benchmark / f"{run_id}.json"
     if record.is_file():

@@ -1,22 +1,25 @@
 # Exact pins for the Wan 2.2 TI2V-5B backend on Camber:
-# Linux x86_64, Python 3.11, one NVIDIA L4 (24 GB), CUDA 12.x driver.
+# Linux x86_64, Python 3.11, one NVIDIA L4 (22 GiB usable).
 # Installed by scripts/camber_setup.py. See docs/RUNNING_ON_CAMBER.md.
 #
-# torch / torchvision come from the PyTorch wheel index (CUDA 12.6 build);
-# everything else from PyPI. The set was checked for mutual compatibility
-# with pip's resolver for manylinux / cp311 on 2026-10-04.
+# diffusers is 0.36.0, not 0.35.2: in 0.35.2 AutoencoderKLWan.tiled_encode /
+# tiled_decode ignore config.patch_size, which the Wan 2.2 VAE uses (2x2
+# patchify, 3 -> 12 channels), so vae_tiling=true crashed with "expected
+# input[1, 3, 3, 258, 258] to have 12 channels, but got 3 channels". Without
+# tiling the VAE decode runs out of memory on the L4. 0.36.0 fixes the tiling.
+# Nothing else had to change for the bump (0.36.0 adds httpx as a dependency).
 #
-# If torch.cuda.is_available() is False on a GPU node because the NVIDIA
-# driver is too old for CUDA 12.6, switch the three torch lines to the
-# CUDA 12.4 build: index .../whl/cu124, torch==2.6.0+cu124,
-# torchvision==0.21.0+cu124.
+# torch / torchvision come from the PyTorch wheel index (CUDA 12.6 build);
+# everything else from PyPI. torch 2.8.0+cu126 ran on Camber's L4 node
+# (driver 580.178.04, CUDA 13.0). The set was checked for mutual compatibility
+# with pip's resolver for manylinux / cp311 on 2026-10-04.
 
 --extra-index-url https://download.pytorch.org/whl/cu126
 
 torch==2.8.0+cu126
 torchvision==0.23.0+cu126
 
-diffusers==0.35.2
+diffusers==0.36.0
 transformers==4.56.2
 tokenizers==0.22.1
 safetensors==0.6.2

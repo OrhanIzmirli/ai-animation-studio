@@ -1,5 +1,7 @@
 import sys
 
+import pytest
+
 from ai_studio.benchmarking import environment
 from ai_studio.benchmarking.environment import (
     ENVIRONMENT_KEYS,
@@ -37,8 +39,59 @@ def test_works_without_pytorch_gpu_nvidia_smi_or_git(monkeypatch, tmp_path):
     assert set(env) == set(ENVIRONMENT_KEYS)
     assert env["python_version"]
     for key in ENVIRONMENT_KEYS:
-        if key not in ("operating_system", "python_version"):
+        if key not in ("operating_system", "python_version", "env_vars"):
             assert env[key] is None, key
+
+
+# --- env_vars ---
+
+def test_env_vars_records_only_the_allowlist(monkeypatch):
+    monkeypatch.setenv("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+    monkeypatch.setenv("HF_HUB_OFFLINE", "1")
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+    monkeypatch.setenv("HF_TOKEN", "secret-must-not-be-recorded")
+
+    env = collect_environment()
+
+    assert environment.RECORDED_ENV_VARS == ("PYTORCH_CUDA_ALLOC_CONF", "CUDA_VISIBLE_DEVICES", "HF_HUB_OFFLINE")
+    assert env["env_vars"] == {
+        "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+        "CUDA_VISIBLE_DEVICES": None,
+        "HF_HUB_OFFLINE": "1",
+    }
+    assert "secret-must-not-be-recorded" not in repr(env)
+
+
+def test_env_vars_are_none_when_unset(monkeypatch):
+    for name in environment.RECORDED_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    assert collect_environment()["env_vars"] == dict.fromkeys(environment.RECORDED_ENV_VARS)
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_env_vars_land_in_success_and_failed_run_records(monkeypatch, project, request_factory, fails):
+    from ai_studio.benchmarking import BenchmarkLogger, BenchmarkRunError, BenchmarkRunner
+    from conftest import FailingBackend, FakeBackend, fake_probe
+
+    monkeypatch.setenv("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    runner = BenchmarkRunner(  # default environment collector: the real one
+        BenchmarkLogger(project / "results"), "outputs", root=project, media_probe=fake_probe,
+    )
+    if fails:
+        with pytest.raises(BenchmarkRunError):
+            runner.run(request_factory(), FailingBackend("generate", MemoryError("CUDA out of memory")), run_id="r")
+    else:
+        runner.run(request_factory(), FakeBackend(), run_id="r")
+
+    saved = runner.logger.load("object_replacement_01", "r")
+    assert saved.status == ("failed" if fails else "success")
+    assert saved.environment["env_vars"] == {
+        "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+        "CUDA_VISIBLE_DEVICES": None,
+        "HF_HUB_OFFLINE": None,
+    }
 
 
 def test_nvidia_smi_unavailable(monkeypatch):

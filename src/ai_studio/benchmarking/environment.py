@@ -3,6 +3,10 @@
 Every probe is optional: a missing GPU, CUDA, PyTorch, nvidia-smi or git
 yields None for that key instead of an error.
 
+env_vars holds a small allowlist of process environment variables that change
+how a run behaves (allocator settings, visible devices, offline mode), each
+None when unset. Nothing else from the process environment is recorded.
+
 Two different CUDA versions are recorded on purpose:
   reported_cuda_version  highest CUDA version the NVIDIA DRIVER supports
                          (from the nvidia-smi header; no PyTorch needed)
@@ -12,6 +16,7 @@ Two different CUDA versions are recorded on purpose:
 from __future__ import annotations
 
 import importlib
+import os
 import platform
 import re
 import shutil
@@ -33,7 +38,11 @@ ENVIRONMENT_KEYS = (
     "reported_cuda_version",
     "cuda_version",
     "pytorch_version",
+    "env_vars",
 )
+
+# Process environment variables worth recording. Keep it short: no paths, no secrets.
+RECORDED_ENV_VARS = ("PYTORCH_CUDA_ALLOC_CONF", "CUDA_VISIBLE_DEVICES", "HF_HUB_OFFLINE")
 
 # Header formats seen in the wild:
 #   "| NVIDIA-SMI 550.54   Driver Version: 550.54   CUDA Version: 12.4 |"
@@ -56,6 +65,7 @@ def collect_environment(repo_dir: str | Path | None = None) -> dict[str, Any]:
     env["cuda_version"] = torch.get("cuda_version")
     env["gpu_model"] = torch.get("gpu_model") or smi.get("gpu_model")
     env["vram_gb"] = torch.get("vram_gb") or smi.get("vram_gb")
+    env["env_vars"] = {name: os.environ.get(name) for name in RECORDED_ENV_VARS}
     return env
 
 

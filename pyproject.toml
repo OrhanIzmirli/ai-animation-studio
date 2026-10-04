@@ -16,7 +16,7 @@ dev = ["pytest>=8", "pillow", "numpy"]
 # install the torch build matching your CUDA version first.
 wan = [
     "torch",
-    "diffusers>=0.35",
+    "diffusers>=0.36",  # 0.35.x cannot tile the Wan 2.2 VAE (ignores patch_size)
     "transformers",
     "accelerate",
     "ftfy",

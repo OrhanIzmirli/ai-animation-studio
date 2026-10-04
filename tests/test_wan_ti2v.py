@@ -315,12 +315,12 @@ def fake_stack(monkeypatch, tmp_path):
             return log.pipe
 
     monkeypatch.setitem(sys.modules, "torch", module(
-        "torch", __version__="2.8.0+cu126", float32="float32", bfloat16="bfloat16",
+        "torch", __version__="2.8.0+cu126", float32="float32", bfloat16="bfloat16",  # noqa: E501
         cuda=SimpleNamespace(is_available=lambda: True), version=SimpleNamespace(cuda="12.6"),
         Generator=lambda device: SimpleNamespace(manual_seed=lambda seed: ("generator", device, seed)),
     ))
     monkeypatch.setitem(sys.modules, "diffusers", module(
-        "diffusers", __version__="0.35.2",
+        "diffusers", __version__="0.36.0",
         AutoencoderKLWan=AutoencoderKLWan, WanImageToVideoPipeline=WanImageToVideoPipeline,
     ))
     monkeypatch.setitem(sys.modules, "transformers", module("transformers", __version__="4.56.2"))
@@ -344,7 +344,7 @@ def test_prepare_loads_the_pinned_revision_as_documented(fake_stack):
     assert backend.metadata().model_version == "0123abc"  # the resolved snapshot commit
     assert backend._make_generator(7) == ("generator", "cuda", 7)
     assert backend._environment == {
-        "torch_version": "2.8.0+cu126", "diffusers_version": "0.35.2",
+        "torch_version": "2.8.0+cu126", "diffusers_version": "0.36.0",
         "transformers_version": "4.56.2", "torch_cuda_version": "12.6",
     }
 
@@ -373,6 +373,39 @@ def test_offline_with_missing_weights_explains_itself(fake_stack, monkeypatch):
     monkeypatch.setenv("HF_HUB_OFFLINE", "1")
     with pytest.raises(RuntimeError, match="HF_HUB_OFFLINE is set"):
         WanTI2V5BBackend().prepare()
+
+
+@pytest.mark.parametrize("version", ["0.35.2", "0.35.0", "0.35.0.dev0"])
+def test_vae_tiling_on_old_diffusers_is_refused_before_loading(fake_stack, monkeypatch, version):
+    monkeypatch.setattr(sys.modules["diffusers"], "__version__", version)
+    backend = WanTI2V5BBackend()
+    backend.validate_inputs(make_request(backend_parameters={"vae_tiling": True}))
+    with pytest.raises(BackendNotInstalledError, match="diffusers <0.36 tiles the Wan 2.2 VAE without patch_size; upgrade"):
+        backend.prepare()
+    assert fake_stack.snapshot == [] and fake_stack.pipeline == []  # nothing was loaded
+
+
+@pytest.mark.parametrize("version", ["0.36.0", "0.36.0.dev0", "0.37.1", "1.0.0"])
+def test_vae_tiling_on_new_enough_diffusers_loads(fake_stack, monkeypatch, version):
+    monkeypatch.setattr(sys.modules["diffusers"], "__version__", version)
+    backend = WanTI2V5BBackend()
+    backend.validate_inputs(make_request(backend_parameters={"vae_tiling": True}))
+    backend.prepare()
+    assert fake_stack.pipe.events == ["vae.enable_tiling", "to(cuda)"]
+
+
+def test_old_diffusers_without_tiling_still_loads(fake_stack, monkeypatch):
+    monkeypatch.setattr(sys.modules["diffusers"], "__version__", "0.35.2")
+    backend = WanTI2V5BBackend()
+    backend.validate_inputs(make_request())
+    backend.prepare()
+    assert fake_stack.pipe.events == ["to(cuda)"]
+
+
+def test_version_tuple():
+    assert wan_ti2v.version_tuple("0.35.2") == (0, 35, 2)
+    assert wan_ti2v.version_tuple("0.36.0.dev0") == (0, 36, 0)
+    assert wan_ti2v.version_tuple("0.36.0") >= wan_ti2v.MIN_DIFFUSERS_FOR_VAE_TILING > wan_ti2v.version_tuple("0.35.2")
 
 
 def test_wrong_weights_are_rejected(fake_stack):

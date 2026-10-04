@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 import shutil
 import subprocess
 from collections.abc import Callable, Sequence
@@ -51,6 +52,9 @@ ENCODER_SETTINGS = {
     "codec": "libx264", "pix_fmt": "yuv420p", "crf": 12, "preset": "slow",
     "fps": NATIVE_FPS, "audio": False,
 }
+# AutoencoderKLWan.tiled_encode / tiled_decode ignore config.patch_size before
+# this release; the Wan 2.2 VAE uses it (2x2 patchify, 3 -> 12 channels).
+MIN_DIFFUSERS_FOR_VAE_TILING = (0, 36, 0)
 INSTALL_HINT = 'install the backend dependencies with: pip install -e ".[wan]"'
 
 
@@ -168,6 +172,11 @@ def encode_frames(frames: Sequence[Any], output: str | Path, fps: int = NATIVE_F
     if process.returncode != 0:
         raise RuntimeError(f"ffmpeg failed ({process.returncode}): {stderr.decode(errors='replace').strip()}")
     return settings
+
+
+def version_tuple(version: str) -> tuple[int, ...]:
+    """Leading numeric components: "0.35.2" -> (0, 35, 2), "0.36.0.dev0" -> (0, 36, 0)."""
+    return tuple(int(part) for part in re.match(r"\d+(?:\.\d+)*", version).group().split("."))
 
 
 def hf_hub_offline() -> bool:
@@ -306,6 +315,11 @@ class WanTI2V5BBackend(VideoGenerationBackend):
             raise BackendNotInstalledError(
                 f"Backend 'wan-ti2v-5b' is not installed ({exc}); {INSTALL_HINT}"
             ) from exc
+        if self._vae_tiling and version_tuple(diffusers.__version__) < MIN_DIFFUSERS_FOR_VAE_TILING:
+            raise BackendNotInstalledError(
+                f"vae_tiling needs diffusers >= 0.36.0, found {diffusers.__version__}: diffusers <0.36 "
+                "tiles the Wan 2.2 VAE without patch_size; upgrade (pip install 'diffusers>=0.36.0')"
+            )
         if not torch.cuda.is_available():
             raise BackendNotInstalledError(
                 "Backend 'wan-ti2v-5b' is not installed for this machine: it needs a CUDA GPU "

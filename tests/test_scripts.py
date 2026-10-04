@@ -289,18 +289,55 @@ def test_camber_run_defaults():
     assert Path(command[2]).name == "run_benchmark.py"
     assert command[3:] == [
         "--benchmark", "comic_rooftop_01", "--backend", "wan-ti2v-5b", "--seed", "42",
-        "--width", "1280", "--height", "704", "--run-id", "RUN", "--param", "cpu_offload=true",
+        "--width", "1280", "--height", "704", "--run-id", "RUN",
+        "--param", "cpu_offload=true", "--param", "vae_tiling=true",
     ]
 
 
 def test_camber_run_extra_params_and_cpu_offload_override():
     command = camber_run.build_command(
-        run_args("--param", "vae_tiling=true", "--notes", "retry after OOM"), "RUN", Path("/p"),
+        run_args("--param", "num_inference_steps=30", "--notes", "first full run"), "RUN", Path("/p"),
     )
-    assert command[-6:] == ["--param", "cpu_offload=true", "--param", "vae_tiling=true", "--notes", "retry after OOM"]
+    assert command[-8:] == [
+        "--param", "cpu_offload=true", "--param", "vae_tiling=true",
+        "--param", "num_inference_steps=30", "--notes", "first full run",
+    ]
 
-    command = camber_run.build_command(run_args("--param", "cpu_offload=false"), "RUN", Path("/p"))
-    assert [c for c in command if c.startswith("cpu_offload")] == ["cpu_offload=false"]
+
+def params_of(command):
+    return [command[i + 1] for i, part in enumerate(command) if part == "--param"]
+
+
+def test_camber_run_l4_defaults_can_be_overridden():
+    command = camber_run.build_command(
+        run_args("--param", "vae_tiling=false", "--param", "cpu_offload=false"), "RUN", Path("/p"),
+    )
+    assert params_of(command) == ["vae_tiling=false", "cpu_offload=false"]  # no default left to clash
+
+
+def test_camber_run_smoke_flag():
+    command = camber_run.build_command(run_args("--smoke"), "RUN", Path("/p"))
+    assert params_of(command) == ["cpu_offload=true", "vae_tiling=true", "num_inference_steps=2"]
+    assert command[-2:] == ["--notes", "SMOKE TEST - not for evaluation"]
+
+    command = camber_run.build_command(run_args("--smoke", "--notes", "after the diffusers bump"), "RUN", Path("/p"))
+    assert command[-1] == "SMOKE TEST - not for evaluation. after the diffusers bump"
+
+    # an explicit step count wins over the smoke default, and is passed only once
+    command = camber_run.build_command(run_args("--smoke", "--param", "num_inference_steps=4"), "RUN", Path("/p"))
+    assert params_of(command) == ["cpu_offload=true", "vae_tiling=true", "num_inference_steps=4"]
+
+
+def test_camber_run_without_smoke_has_no_step_override_or_note():
+    command = camber_run.build_command(run_args(), "RUN", Path("/p"))
+    assert "--notes" not in command and not any("num_inference_steps" in part for part in command)
+
+
+def test_camber_run_sets_allocator_config_unless_already_set(monkeypatch, tmp_path):
+    monkeypatch.delenv("PYTORCH_CUDA_ALLOC_CONF", raising=False)
+    assert camber_run.run_environment(tmp_path)["PYTORCH_CUDA_ALLOC_CONF"] == "expandable_segments:True"
+    monkeypatch.setenv("PYTORCH_CUDA_ALLOC_CONF", "max_split_size_mb:512")
+    assert camber_run.run_environment(tmp_path)["PYTORCH_CUDA_ALLOC_CONF"] == "max_split_size_mb:512"
 
 
 def test_camber_run_environment(tmp_path):
@@ -383,6 +420,10 @@ def test_camber_run_runs_the_cli_then_collects(monkeypatch, tmp_path, capsys):
     assert command[0] == str(env_python) and cwd == project
     assert env["HF_HUB_OFFLINE"] == "1" and env["AI_STUDIO_ROOT"] == str(project)
     assert "Tesla L4" in out
+    # effective settings are printed before the run starts
+    assert "mode: full run" in out
+    assert "backend parameters: cpu_offload=true vae_tiling=true" in out
+    assert f"PYTORCH_CUDA_ALLOC_CONF={env['PYTORCH_CUDA_ALLOC_CONF']}" in out
     (archive,) = (project / "dist").glob("run-comic_rooftop_01-*.zip")
     assert str(archive) in out
     with zipfile.ZipFile(archive) as z:
@@ -496,7 +537,7 @@ def test_camber_requirements_are_exact_pins():
     ]
     assert lines[0] == "--extra-index-url https://download.pytorch.org/whl/cu126"
     pins = dict(line.split("==") for line in lines[1:])
-    assert pins["diffusers"] == "0.35.2"
+    assert pins["diffusers"] == "0.36.0"  # 0.35.x cannot tile the Wan 2.2 VAE
     assert pins["torch"].endswith("+cu126") and pins["torchvision"].endswith("+cu126")
     assert {"transformers", "accelerate", "ftfy", "pillow", "numpy", "huggingface_hub", "pyyaml"} <= set(pins)
     assert "imageio" not in pins

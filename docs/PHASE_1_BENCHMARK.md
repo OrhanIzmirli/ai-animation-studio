@@ -145,7 +145,9 @@ are the measured values, or the backend-reported ones when nothing could be
 measured), all effective
 backend parameters (requested values plus defaults the backend applied; any
 value the backend changed is noted), environment (OS, Python, git commit and
-dirty flag, GPU, VRAM, driver, CUDA, PyTorch, backend library versions),
+dirty flag, GPU, VRAM, driver, CUDA, PyTorch, backend library versions, and
+`env_vars`: the process environment variables `PYTORCH_CUDA_ALLOC_CONF`,
+`CUDA_VISIBLE_DEVICES` and `HF_HUB_OFFLINE`, `null` when unset),
 a per-stage timing breakdown, estimated cost when supplied, the run
 status (success or failed, with failure stage and error), and the generated
 `output_video` (project-relative, forward slashes; required for successful

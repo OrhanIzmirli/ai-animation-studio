@@ -4,10 +4,14 @@ Adapter: [`src/ai_studio/generation/backends/wan_ti2v.py`](../src/ai_studio/gene
 class `WanTI2V5BBackend`. Contract: `VideoGenerationBackend`,
 `supports_start_frame = True`.
 
-> **Status: implemented and tested with an injected fake pipeline. Not yet run
-> on a GPU.** The tests cover everything around the model (validation, frame
-> rule, start-frame preprocessing, encoding, the runner's measurement) but not
-> the diffusers calls themselves. The first real run is the next step.
+> **Status: partly verified on a real GPU; no successful run yet.** Two runs
+> on Camber's NVIDIA L4 (22 GiB usable, diffusers 0.35.2) loaded the weights
+> and completed the denoising steps, then failed: once out of memory in the
+> VAE decode, once inside the tiled VAE (a diffusers 0.35.2 bug, see
+> [L4 findings](#findings-from-the-first-runs-on-an-l4)). The VAE decode with
+> tiling on diffusers 0.36.0, the encoding of real frames and the output
+> quality are still unverified. Everything around the model is covered by
+> tests with an injected fake pipeline.
 
 | | |
 |---|---|
@@ -39,13 +43,16 @@ advance; it is ranked by its benchmark results like any later backend.
 pip install -e ".[wan]"
 ```
 
-The `wan` extra is `torch`, `diffusers>=0.35`, `transformers`, `accelerate`,
-`ftfy`, `pillow`, `numpy`, `huggingface_hub`. **Use `diffusers==0.35.2`** for
-benchmark runs: 0.35 is the release line that added Wan 2.2, and the adapter
-was written against it. Newer releases are allowed by the extra but have not
-been checked. The diffusers version actually used is recorded in every run's
-`environment`. For Camber there is a fully pinned set,
-`requirements/camber-wan.txt`; see [RUNNING_ON_CAMBER.md](RUNNING_ON_CAMBER.md).
+The `wan` extra is `torch`, `diffusers>=0.36`, `transformers`, `accelerate`,
+`ftfy`, `pillow`, `numpy`, `huggingface_hub`. **Use `diffusers==0.36.0`** for
+benchmark runs. 0.35 added Wan 2.2, but its `AutoencoderKLWan` tiles without
+`patch_size`, so `vae_tiling` crashes there; 0.36.0 fixes that. The adapter
+refuses `vae_tiling=true` on an older diffusers with a clear message instead
+of crashing inside the VAE. The diffusers version actually used is recorded
+in every run's `environment`. For Camber there is a fully pinned set,
+`requirements/camber-wan.txt` (torch 2.8.0+cu126, diffusers 0.36.0,
+transformers 4.56.2, accelerate 1.10.1, huggingface_hub 0.35.3, ...); see
+[RUNNING_ON_CAMBER.md](RUNNING_ON_CAMBER.md).
 
 Also required on `PATH`: `ffmpeg` (encoding) and `ffprobe` (the runner's
 measurement).
@@ -63,8 +70,26 @@ the run fails with a message naming `HF_HOME`.
 
 **24 GB cards (e.g. L4).** On disk the transformer is ~20 GB in fp32 (~10 GB
 in bf16 once loaded), the text encoder ~11.4 GB and the VAE ~2.8 GB. Together
-they do not fit in 24 GB of VRAM, so use `cpu_offload=true` there. If decoding
-still runs out of memory, add `vae_tiling=true`.
+they do not fit in 24 GB of VRAM, so use `cpu_offload=true` there, and
+`vae_tiling=true` as well: without tiling the VAE decode of 121 frames at
+1280×704 ran out of memory on the L4.
+
+### Findings from the first runs on an L4
+
+Camber, NVIDIA L4 (22.03 GiB usable), driver 580.178.04, torch 2.8.0+cu126,
+1280×704, 121 frames, `cpu_offload=true`:
+
+| | |
+|---|---|
+| Loading the weights | 6 min 18 s from the network disk (~92 s per fp32 transformer shard) |
+| Denoising | ~30 s per step |
+| Run 1: no tiling, diffusers 0.35.2 | 4 steps completed, then CUDA out of memory in the VAE decode ("Tried to allocate 2.60 GiB", 18.34 GiB already allocated by PyTorch) |
+| Run 2: `vae_tiling=true`, diffusers 0.35.2 | failed at the start of generation: "weight of size [160, 12, 3, 3, 3], expected input[1, 3, 3, 258, 258] to have 12 channels, but got 3 channels" |
+
+Cause of run 2: in diffusers 0.35.2 `AutoencoderKLWan.tiled_encode` /
+`tiled_decode` ignore `config.patch_size`, which the Wan 2.2 VAE uses (2×2
+patchify, 3 → 12 channels). diffusers 0.36.0 handles `patch_size` in both and
+unpatchifies after a tiled decode. Hence the pin.
 
 ## What a request must look like
 
@@ -168,8 +193,10 @@ measurement, not from the adapter.
 
 ## Known limits
 
-- **Not run on a GPU yet** (see status above). Loading, VRAM use, timings and
-  output quality are unverified.
+- **No successful run yet** (see status above). Decoding with tiling on
+  diffusers 0.36.0, decode time and output quality are unverified.
+- `vae_tiling=true` needs diffusers >= 0.36.0; on an older version `prepare()`
+  raises `BackendNotInstalledError` (a setup problem: nothing is recorded).
 - Image-to-video only; text-only requests are rejected.
 - 24 fps and the two native resolutions only; at most 121 frames (~5 s).
 - `reference_images` are ignored, with a warning. Only the start frame
