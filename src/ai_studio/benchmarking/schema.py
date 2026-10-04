@@ -51,13 +51,14 @@ Schema history:
        only as a fallback). Why: a pinned fps / duration cannot be enforced
        from what the backend claims. Migration: none; v1-v7 load with None,
        and their fps / frame_count remain backend-reported.
-     (no version change) failure_stage may also be "abandoned": the run
-       started generating and no record was ever saved. Such a record is
-       never written by the runner, only afterwards by
+  9  failure_stage may also be "abandoned": the run started generating and
+       no record was ever saved (process killed, crash, power loss). Such a
+       record is never written by the runner, only afterwards by
        scripts/find_abandoned_runs.py from the run's in-progress marker
-       (ai_studio.benchmarking.in_progress). No field was added or changed,
-       so the version stays 8; code older than this change rejects such a
-       record when loading it.
+       (ai_studio.benchmarking.in_progress). No field was added, but the set
+       of allowed values grew: a v8 reader rejects such a record, hence the
+       new version. "abandoned" is only valid in v9+ records. Migration:
+       none; v1-v8 files load unchanged and keep their version.
 """
 
 from __future__ import annotations
@@ -69,7 +70,7 @@ from typing import Any
 from ai_studio.media import Resolution  # re-exported: Phase 0-1A import path
 from ai_studio.media_probe import OUTPUT_MEDIA_KEYS
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 STATUSES = ("success", "failed")
 TASK_TYPES = ("video_generation", "video_editing")  # = Capability values
@@ -77,7 +78,9 @@ START_FRAME_KEYS = (
     "path", "sha256", "original_width", "original_height",
     "preprocessing", "effective_width", "effective_height", "derived_file",
 )
-FAILURE_STAGES = ("validation", "prepare", "generation", "verification", "logging", "abandoned")
+ABANDONED_STAGE = "abandoned"  # v9+; written from an in-progress marker, never by the runner
+ABANDONED_SINCE_VERSION = 9
+FAILURE_STAGES = ("validation", "prepare", "generation", "verification", "logging", ABANDONED_STAGE)
 
 _UNSAFE_FILE_NAME_CHARS = '/\\:*?"<>|'
 
@@ -187,6 +190,10 @@ class BenchmarkResult:
         if self.status == "failed":
             if self.failure_stage not in FAILURE_STAGES:
                 raise ValueError(f"failed run needs failure_stage in {FAILURE_STAGES}")
+            if self.failure_stage == ABANDONED_STAGE and self.schema_version < ABANDONED_SINCE_VERSION:
+                raise ValueError(
+                    f"failure_stage {ABANDONED_STAGE!r} needs schema_version >= {ABANDONED_SINCE_VERSION}"
+                )
             if not self.error_type:
                 raise ValueError("failed run needs error_type")
         elif any((self.failure_stage, self.error_type, self.error_message)):

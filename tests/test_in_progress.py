@@ -246,7 +246,7 @@ def test_record_abandoned_writes_a_failed_record_and_deletes_nothing(runner, req
     assert record == runner.logger.load(BENCH, "run-dead")
     assert record.status == "failed" and record.failure_stage == "abandoned"
     assert record.error_type == "AbandonedRun" and "never finished" in record.error_message
-    assert record.schema_version == SCHEMA_VERSION  # no schema version change
+    assert record.schema_version == SCHEMA_VERSION >= 9  # "abandoned" exists since schema v9
     assert record.output_video is None and record.output_media is None
     assert record.seed == 1234 and record.model_parameters == {"steps": 4}
     assert record.input_checksums and record.source_video == "benchmarks/inputs/source.mp4"
@@ -260,6 +260,18 @@ def test_record_abandoned_writes_a_failed_record_and_deletes_nothing(runner, req
     # the run id stays taken
     with pytest.raises(FileExistsError):
         runner.run(request_factory(), FakeBackend(), run_id="run-dead")
+
+
+def test_marker_written_before_schema_v9_is_recorded_as_v9(runner, request_factory):
+    output_dir = abandon(runner, request_factory())
+    path = marker_path(output_dir)
+    marker = json.loads(path.read_text(encoding="utf-8"))
+    marker["record"]["schema_version"] = 8  # as the first version of the marker code wrote it
+    path.write_text(json.dumps(marker), encoding="utf-8")
+    (run,) = find_abandoned(runner.outputs_dir, runner.logger, stale_after_hours=0)
+    record = record_abandoned(run, runner.logger)
+    assert record.schema_version == 9 and record.failure_stage == "abandoned"
+    assert runner.logger.load(BENCH, "run-dead") == record
 
 
 def test_abandoned_is_a_failure_stage_only_for_failed_records():

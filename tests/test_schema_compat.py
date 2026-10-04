@@ -21,6 +21,7 @@ ALL_FIXTURES = [
     "v6_generation_success", "v6_editing_failed",
     "v7_image_to_video_success",
     "v8_measured_output_success",
+    "v9_abandoned_failed",
 ]
 
 
@@ -29,8 +30,8 @@ def load_fixture(name):
 
 
 def test_current_schema_version_has_a_fixture():
-    assert SCHEMA_VERSION == 8
-    assert (FIXTURES / "v8_measured_output_success.json").is_file()
+    assert SCHEMA_VERSION == 9
+    assert (FIXTURES / "v9_abandoned_failed.json").is_file()
 
 
 def test_v1_loads():
@@ -211,8 +212,41 @@ def test_failed_run_with_output_media_rejected():
     assert BenchmarkResult.from_dict(data).status == "failed"
 
 
-def test_current_records_roundtrip(tmp_path):
-    record = load_fixture("v8_measured_output_success")
+@pytest.mark.parametrize("name", ALL_FIXTURES[:11])
+def test_pre_v9_records_are_never_abandoned(name):
+    assert load_fixture(name).failure_stage != "abandoned"
+
+
+def test_v9_abandoned_loads():
+    record = load_fixture("v9_abandoned_failed")
+    assert record.schema_version == 9
+    assert record.status == "failed" and record.failure_stage == "abandoned"
+    assert record.error_type == "AbandonedRun"
+    assert record.output_video is None and record.output_media is None
+    assert record.seed == 42 and record.input_checksums  # what was requested is kept
+    assert record.start_frame["sha256"] and record.start_frame["effective_width"] is None
+
+
+@pytest.mark.parametrize("version", [4, 6, 8])
+def test_abandoned_is_not_a_failure_stage_before_v9(version):
+    data = json.loads((FIXTURES / "v9_abandoned_failed.json").read_text(encoding="utf-8"))
+    data["schema_version"] = version
+    with pytest.raises(ValueError, match="schema_version >= 9"):
+        BenchmarkResult.from_dict(data)
+    data["failure_stage"] = "generation"  # the stages v4-v8 knew are still fine there
+    assert BenchmarkResult.from_dict(data).schema_version == version
+
+
+def test_abandoned_success_rejected():
+    data = json.loads((FIXTURES / "v8_measured_output_success.json").read_text(encoding="utf-8"))
+    data.update(schema_version=9, failure_stage="abandoned")
+    with pytest.raises(ValueError, match="successful run must not have failure fields"):
+        BenchmarkResult.from_dict(data)
+
+
+@pytest.mark.parametrize("name", ["v8_measured_output_success", "v9_abandoned_failed"])
+def test_current_records_roundtrip(tmp_path, name):
+    record = load_fixture(name)
     logger = BenchmarkLogger(tmp_path)
     logger.log(record)
     assert logger.load(record.benchmark_id, record.run_id) == record

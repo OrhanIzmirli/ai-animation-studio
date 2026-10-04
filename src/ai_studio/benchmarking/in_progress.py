@@ -32,11 +32,10 @@ from pathlib import Path
 from typing import Any
 
 from ai_studio.benchmarking.logger import BenchmarkLogger
-from ai_studio.benchmarking.schema import BenchmarkResult
+from ai_studio.benchmarking.schema import ABANDONED_SINCE_VERSION, ABANDONED_STAGE, BenchmarkResult
 
 MARKER_NAME = "RUN_IN_PROGRESS.json"
 MARKER_VERSION = 1
-ABANDONED_STAGE = "abandoned"
 ABANDONED_ERROR_TYPE = "AbandonedRun"
 DEFAULT_STALE_HOURS = 6.0
 
@@ -193,6 +192,8 @@ def record_abandoned(
         output_video=None,  # whatever is in the folder was never verified
         output_media=None,
         notes="\n".join(line for line in (data.get("notes"), note) if line),
+        # A marker written by older code carries an older version; "abandoned" starts at v9.
+        schema_version=max(data.get("schema_version") or 0, ABANDONED_SINCE_VERSION),
     )
     record = BenchmarkResult.from_dict(data)
     logger.log(record)  # "x" mode: never overwrites
