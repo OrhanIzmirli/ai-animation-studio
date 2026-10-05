@@ -66,6 +66,8 @@ configs/*.local.yaml
 
 # Spike outputs (frames, videos, logs); spike scripts and reports are tracked.
 spikes/output/
+# Images a spike writes anywhere under spikes/ (e.g. sdxl_ipadapter_spike.py) stay out of git.
+spikes/**/*.png
 
 # --- Temporary files ---
 tmp/
