@@ -98,8 +98,12 @@ def main() -> int:
         variant = "_ls0.8" if (record["model_parameters"] or {}).get("latent_scale", 1.0) != 1.0 else ""
         label = f"{kind}_seed{record['seed']}{variant}_{short}"
         env, tp = record["environment"], record["model_parameters"] or {}
-        metrics_path = REPO / "benchmarks" / "metrics" / BENCHMARK / run_id / "metrics_v1.json"
-        metrics = json.loads(metrics_path.read_text(encoding="utf-8"))["metrics"] if metrics_path.is_file() else {}
+        metrics = {}
+        for version in ("1", "2"):  # v1 where it exists (the version this report was written with), else v2
+            metrics_path = REPO / "benchmarks" / "metrics" / BENCHMARK / run_id / f"metrics_v{version}.json"
+            if metrics_path.is_file():
+                metrics = json.loads(metrics_path.read_text(encoding="utf-8"))["metrics"]
+                break
         lowest, total = env.get("ram_available_min_gb"), env.get("ram_total_gb")
         rows.append({
             "label": label, "run_id": run_id, "backend": record.get("backend"), "seed": record["seed"],

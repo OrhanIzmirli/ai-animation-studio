@@ -4,10 +4,10 @@ Date: 2026-10-04 / 05. Benchmark `comic_rooftop_01`, 1280×704, 121 frames,
 24 fps, on the development laptop (RTX 4060 Laptop 8 GB, 16 GB RAM) through
 the local ComfyUI backends. All E1 runs have `run_purpose: experiment`.
 
-> **Incomplete: E1-6 (the base model) did not finish.** Five of the six
-> planned runs succeeded. The base-model run was killed from outside while it
-> was running, so there is no base-model clip in this report. See
-> [E1-6](#e1-6-base-model-seed-42-not-completed).
+> **Update 2026-10-05, 02:12:** all six runs now exist. The first attempt at
+> E1-6 (the base model) was stopped from outside while it was sampling and
+> left no record; it was run again alone and succeeded. See
+> [E1-6](#e1-6--base-model-seed-42).
 
 > **This report describes; it does not rank.** Nobody has rated these clips.
 > Which one looks best is for a human to decide, with the review material
@@ -27,7 +27,7 @@ tree (`git_dirty: false`).
 | `turbo_seed3_9917a359` (E1-3) | `wan-ti2v-5b-turbo-comfyui` | 3 | 4 steps, CFG 1, uni_pc/simple, shift 8 | success | 318.4 | 42.6 | 274.5 | 6.88 | 0.33 | 15.38 | 1.658 | 3.628 | 25.214 | 41.33 | 1.17 | 0.451 | 51.5 | 54.6 | 0.000 |
 | `turbo_seed4_b3d7d934` (E1-4) | `wan-ti2v-5b-turbo-comfyui` | 4 | 4 steps, CFG 1, uni_pc/simple, shift 8 | success | 319.6 | 51.3 | 267.0 | 8.05 | 0.29 | 15.42 | 1.596 | 3.071 | 24.676 | 41.32 | 1.13 | 0.393 | 51.8 | 54.6 | 0.000 |
 | `turbo_seed42_ls0.8_b0ae7318` (E1-5) | `wan-ti2v-5b-turbo-comfyui` | 42 | 4 steps, CFG 1, uni_pc/simple, shift 8, latent_scale 0.8 | success | 312.5 | 39.2 | 271.9 | 8.23 | 0.34 | 15.37 | 1.511 | 2.953 | 24.798 | 27.58 | 1.11 | 0.554 | 60.4 | 64.0 | 0.000 |
-| E1-6 | `wan-ti2v-5b-comfyui` | 42 | 20 steps, CFG 5, uni_pc/simple, shift 8 | **not completed** | – | – | – | – | – | – | – | – | – | – | – | – | – | – | – |
+| `base_seed42_84f3fd82` (E1-6) | `wan-ti2v-5b-comfyui` | 42 | 20 steps, CFG 5, uni_pc/simple, shift 8 | success | 1035.1 | 37.4 | 996.9 | 7.53 | 0.22 | 15.49 | 0.221 | 0.726 | 2.862 | 41.32 | 1.83 | 0.157 | 54.4 | 55.4 | 0.908 |
 
 Columns: times are the runner's wall-clock stages. "RAM before" is the
 available RAM before loading, "RAM lowest" the lowest available value sampled
@@ -37,7 +37,10 @@ quality columns are metrics v1 ([QUALITY_METRICS.md](../QUALITY_METRICS.md)):
 
 Run ids: `20261004T210526Z-92e20c65`, `20261004T213140Z-c21a84d8`,
 `20261004T213707Z-0c960de6`, `20261004T214234Z-9917a359`,
-`20261004T214758Z-b3d7d934`, `20261004T215325Z-b0ae7318`.
+`20261004T214758Z-b3d7d934`, `20261004T215325Z-b0ae7318`,
+`20261004T235440Z-84f3fd82` (E1-6, code at commit `c2a84c6`, clean tree; its
+metrics are version 2, whose values for these columns are defined exactly as
+in version 1).
 
 ### Conditions
 
@@ -47,6 +50,9 @@ Run ids: `20261004T210526Z-92e20c65`, `20261004T213140Z-c21a84d8`,
 - The five E1 runs took 312–322 s; the earlier seed-42 run took 278 s. The
   difference is in ComfyUI's own time (248–261 s against 226 s). The cause
   was not investigated; memory pressure is a candidate, not a finding.
+
+- E1-6 ran later, alone on the GPU, with the same browser open and a second
+  coding session working in parallel on the CPU.
 
 ## What is the same in every Turbo clip
 
@@ -160,21 +166,49 @@ Same seed as the first run, so the content can be compared directly.
 So at 0.8 the saturation after frame 0 (105–108) ends up below the start
 frame's own level (120), not at it.
 
-### E1-6 — base model, seed 42: not completed
+### E1-6 — base model, seed 42
 
-`wan-ti2v-5b-comfyui`, defaults (20 steps, CFG 5), started 23:58:43. The
-whole batch command was stopped by the coding assistant's host program
-because the system was critically low on memory, at some point before 00:03
-(the exact moment was not logged). It was an external stop of the process,
-not an error raised by the run, so **no run record was written** and there
-is nothing to rate. Its partial output folder (only the derived start frame)
-and the copy uploaded to ComfyUI were deleted.
+`wan-ti2v-5b-comfyui`, defaults (20 steps, CFG 5), run `20261004T235440Z-84f3fd82`.
 
-What this does and does not show: it is not evidence that the base model
-cannot run here (the spike completed a base run in 34 minutes with an
-untiled decode). It does show that a 13-minute sampling phase on this
-machine, with a browser open and RAM at its limit, is exposed to this kind
-of interruption. The run has not been repeated.
+- **Time:** 1035 s (17.3 min): ComfyUI 989 s, of which sampling is 20 steps
+  with two model passes each. About 3.3 times a Turbo run. Available RAM fell
+  to 0.22 GB, as in the Turbo runs; it did not run out.
+- **Head turn:** from behind and unchanged on frames 0 to 96. At frame 120
+  the head has turned a little to the right: the ear and the edge of the
+  cheek are visible, no face. The smallest turn of all seven clips.
+- **Motion:** almost none. `motion_mean` 0.22 against 1.3–1.7 for Turbo
+  (5.9 for seed 2); 91 % of the transitions are below the "held" threshold;
+  the last frame differs from the first by 2.9 against 25–33 for Turbo. On
+  the sampled frames the body, the hands and the feet do not move. This is
+  not a hold pattern (periodicity 0.26); the picture simply changes very
+  little from frame to frame.
+- **Face vs. rest:** no face is shown, so the style mismatch seen in the
+  Turbo clips does not arise in this clip.
+- **Colour:** saturation 119 on frame 0 and 126–128 afterwards: a rise of
+  about 7, against 15–19 for the Turbo defaults.
+- **Background:** skyline, sun and billboard unchanged on all six frames.
+- **Pulse:** `pulse_ratio` 1.83, higher than the Turbo clips (1.08–1.31)
+  and with the same phase pattern as the L4 smoke run (strongest at the
+  4-frame chunk boundary), at a much lower level of motion.
+- **No colour glitches.** The spike's base-model run (same model, seed and
+  sampler settings, but an untiled decode while the machine was paging 6.5 GB)
+  showed two green/blue episodes with frame-to-frame jumps up to 11.7. Here
+  the largest jump is 0.73. That fits the decode, not the sampling, as the
+  cause of those glitches, but the two runs also differed in other ways
+  (separate ComfyUI sessions), so it is not proven.
+
+The prompt asks for a character who "stays mostly still" and "near the end
+slowly turns his head slightly toward the camera". Which clip serves that
+better is for the reviewer; the measurements are in the table.
+
+### The first attempt at E1-6
+
+Started 23:58:43 on 2026-10-04 inside the batch. The whole batch command was
+stopped by the coding assistant's host program because the system was
+critically low on memory, at some point before 00:03. It was an external
+stop of the process, not an error raised by the run, so no run record was
+written. Its partial output folder (only the derived start frame) and the
+copy uploaded to ComfyUI were deleted at the time.
 
 ## Review material
 
@@ -184,7 +218,7 @@ In `spikes/output/E1/` (git-ignored; regenerate with `python spikes/e1_review.py
 |---|---|
 | `contact_<label>.png` | frames 0, 24, 48, 72, 96, 120 of one run, labelled, 640×352 each, three per row |
 | `face_<label>.png` | the same frames cropped to the head-and-shoulders box |
-| `compare_grid.mp4` | the six clips tiled in one 24 fps video, each tile labelled with run id, seed and settings |
+| `compare_grid.mp4` | the seven clips tiled in one 24 fps video, each tile labelled with run id, seed and settings |
 | `table.md`, `numbers.json` | the table above and the saturation / head-region numbers quoted here |
 
 **Head-and-shoulders box:** left 160, top 100, right 660, bottom 420 (500×320
@@ -203,4 +237,8 @@ The videos themselves: `outputs/comic_rooftop_01/<run_id>/out.mp4`.
   glitches, how smooth the turn is) is not described here.
 - One run per setting; five seeds for the defaults. The "largest turn" and
   similar comparisons are about these frames only.
-- The base model is missing, so nothing here compares Turbo with base.
+- Turbo and base are compared on **one seed** (42) only. One base clip does
+  not show how the base model behaves in general.
+- All raw videos of this experiment were deleted by accident on 2026-10-05
+  and regenerated; each regenerated file is byte-identical to the original
+  (verified against the recorded SHA-256), so the descriptions still apply.
