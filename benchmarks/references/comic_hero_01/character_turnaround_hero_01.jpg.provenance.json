@@ -1,0 +1,41 @@
+{
+  "provenance_version": 1,
+  "asset_set": "comic_hero_01",
+  "file": "benchmarks/references/comic_hero_01/character_turnaround_hero_01.jpg",
+  "sha256": "7a7b391bc05a948e57b52b6173a03ef912f890875b0865c07e90dacf47d09c8a",
+  "bytes": 141207,
+  "width": 1024,
+  "height": 765,
+  "format": "JPEG",
+  "original_filename": "character_turnaround_hero_01.jpg",
+  "origin": "made by hand in an external tool and imported; not produced by a backend of this project",
+  "stated_by_user": {
+    "tool": "Gemini app",
+    "model": "Nano Banana image model (exact image-generation label not shown in the app UI; the app's conversational model was set to Gemini 3.6 Flash at the time)",
+    "made_on": "2026-10-05",
+    "input_references": [
+      {
+        "path": "benchmarks/references/comic_hero_01/rooftop_frame_v001.png",
+        "sha256": "3a3e76750196317ee5142d7d6d00d2c68af58a993ee54ca8cc9fa665dbf1e0fb"
+      }
+    ],
+    "notes": "Single three-view turnaround sheet (front/3-4/back), chosen over the five-separate-images plan from the overnight prompt pack. Produced over 5 edit turns in one Gemini conversation; see the prompt file for the full chain. A separate, unrelated file the user had manually placed in this asset-set folder (not through this script) was removed by the user before this import."
+  },
+  "prompt": "This image was produced through an iterative conversation in the Gemini app, not a single prompt. The turns, in order:\n\nTurn 1 (initial front-view-only attempt, later superseded):\n\"Using the attached rooftop image as the reference for the character and for the drawing style, draw one full-body illustration of the same young man, seen from the front. He stands upright in a neutral pose, facing the viewer directly, arms relaxed at his sides, feet slightly apart. The whole figure is visible from the top of his hair to the soles of his shoes, centred, with some empty space around him. His face is fully visible and uncovered: a young man of about twenty with a calm, neutral expression, dark eyes and dark eyebrows. He has short curly dark hair, almost black, with volume on top, and a slim build. He wears a black hooded jacket with the hood down and subtle dark-red accents along the seams and cuffs, a black backpack on both shoulders with dark-red straps and small light buckles, dark loose cargo trousers with a side pocket, and white low-top sneakers with dark details and white laces. Dark red is the only accent colour. All clothing is plain fabric with no printed graphics, no writing and no symbols. Background: plain flat light grey, nothing else in the picture, no scenery, no floor pattern, only a small soft contact shadow under the shoes. Drawn in the same style as the rooftop reference image: a graphic novel illustration with strong black ink contours of varying line weight, controlled cel shading with only a few flat tones per surface, halftone dot texture in the shadows and hand-drawn hatching. Flat, even studio lighting instead of the sunset light of the reference. Not photorealistic, not a 3D render, no soft airbrushed gradients. One single figure, one single view. Portrait format, 3:4.\"\n\nTurn 2 (edit request to raise rendering quality, applied to the turn 1 result):\n\"Redraw this same character in the exact same pose, same clothing, same proportions — but completely re-render the illustration quality to match the attached rooftop reference image, not the flat version you just made. Target quality: a painterly, cinematic comic illustration of professional, big-budget animated feature quality. Specifically change lighting (strong directional studio lighting with real highlights, core shadows and reflected light), color (rich, layered tones per surface), surface texture (fine grain, subtle noise, slight wear), linework (naturally varying weight, hand-drawn feel), and overall rendering (painterly, not flat cel-shaded clip art). Keep the pose, outfit, identity and plain grey background unchanged.\"\n\nTurn 3 (request to turn it into a three-view turnaround sheet):\n\"Create a single character turnaround reference sheet: three full-body views of the same character side by side on one plain light grey background — front view, 3/4 side view, and back view. Keep identical scale, identical lighting, and a shared ground line across all three poses so they read as one single consistent sheet. Render all three views in the same painterly, cinematic illustration style as the rooftop reference: dramatic directional lighting, rich saturated color grading, visible painterly brush texture and grain, naturally varying linework, and the overall polish of professional animated-feature key art. Keep the character's face, hair, build and full outfit identical to the earlier approved version.\"\n\nTurn 4 (user's own prompt, typed directly into the same thread, building on the turn 3 result):\n\"A traditional character model sheet showcasing the same character from three views: front, 3/4, and back layout on a plain solid light grey background. The entire image must look 100% like traditional physical media comic art, completely avoiding any smooth vector digital render. The identity of the handsome young man with curly dark hair, his build, and every detail of his outfit must remain absolutely identical across all three views. Specifically add traditional hand-crafted elements: Irregular hand-inked fineliner linework with genuine human weight variations, thick confident outer contours, thinner interior details, featuring deliberate shaky line imperfections and ink bleeding. Shading on the face and skin made of distinct, flat, angular geometric blocks, rough cross-hatching, and visible wax pencil strokes rather than smooth gradients. Bold, flat grimy cell-shading blocks on the clothing mixed with coarse, imperfect halftone screen-tone dot patterns in the mid-tones that look manually stamped. Visible physical paper tooth and grimy marker texture overlay across the whole layout, looking like a physical scanned page from an animator's chaotic physical sketchbook. A touch of dramatic rim-lighting in a dark-red accent color catching the edges of the hair and jacket silhouette. Completely free from generic AI face templates, perfectly sterile vector lighting, or automated symmetry. Pure human-crafted character production art --v 6.0 --style raw\"\n\nTurn 5 (final edit, applied on top of the turn 4 result, this produced the approved image):\n\"Keep the exact same three views, pose, outfit, identity, color palette and layout. Change only the rendering so it reads as a human illustrator's original concept art, not a uniformly finished, polished piece: leave some areas visibly looser and more gestural while keeping the face and torso more tightly rendered; let faint construction/under-sketch lines show through in a few places, as if not fully erased; give the linework a visible medium signature (ink pooling, bristle/nib texture, pressure-varying line weight); treat the proportions as a deliberate stylistic choice rather than photorealistic correctness; avoid a perfectly uniform halftone dot grid. Do not change the character's identity, outfit, pose, or the three-view layout.\"",
+  "prompt_source": "file character_turnaround_hero_01.prompt.txt",
+  "prompt_sha256": "84172559b81aa2c451aa34ad1b37b3f640f37d31f8ab90e9e48f351596924819",
+  "source_file_modified": "2026-10-05T13:33:19.502813+00:00",
+  "imported_at": "2026-10-05T13:48:52.741922+00:00",
+  "visible_watermark_check": {
+    "method": "compact near-neutral shape that stands apart from its corner (heuristic, report only)",
+    "version": "1",
+    "corner_side": 107,
+    "corners": {
+      "top_left": null,
+      "top_right": null,
+      "bottom_left": null,
+      "bottom_right": null
+    },
+    "flagged": []
+  }
+}
