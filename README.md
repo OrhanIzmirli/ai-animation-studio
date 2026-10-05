@@ -135,3 +135,7 @@ the current directory (override with `AI_STUDIO_ROOT`).
 - Quality is more important than generation speed.
 - One architectural change at a time, and benchmark it.
 - No premature UI, agents or over-engineering.
+
+## License
+
+License: Apache 2.0, see [LICENSE](LICENSE).
