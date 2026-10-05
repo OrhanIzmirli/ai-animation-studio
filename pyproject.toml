@@ -7,6 +7,7 @@ name = "ai-animation-studio"
 version = "0.0.1"
 description = "Self-correcting AI animation and video production pipeline (Phase 0: engineering and benchmarking foundation)"
 readme = "README.md"
+license = {text = "Apache-2.0"}
 requires-python = ">=3.11,<3.12"
 dependencies = ["pyyaml>=6", "numpy"]
 
