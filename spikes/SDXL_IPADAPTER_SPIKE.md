@@ -125,6 +125,53 @@ Peak VRAM 6.8 GB, about 34 s per image.
   steps; the limit met was system RAM while training in the background.
   No cloud GPU was needed up to this point and none was set up.
 
+## Character LoRA, trained in parts (third session, same day)
+
+- Started again from step 0: the interrupted run had saved nothing, so there
+  was nothing to continue from.
+- Six parts of 100 steps each (not 120: a part has to finish inside the
+  10-minute limit of one foreground command, and 100 steps took 6.7 to
+  7.5 minutes including start-up). Each part saved its LoRA and the next
+  continued from that file with a new seed; the optimizer state is not
+  carried over between parts.
+- Rank 8, learning rate 1e-4, AdamW, bf16, batch size 1,
+  `--checkpoint-depth 3 --offloading`, the eight-image set above.
+- Total 2,561 s (42.7 minutes) for 600 steps, about 4.1 s per step. Peak VRAM
+  7.0 to 7.1 GB in every part. Available RAM fell to 0.01 to 0.19 GB in
+  every part and came back to about 10.5 GB between parts; no part failed.
+- Files: `spikes/output/hero_lora/ai_studio_hero01_r8_<N>_steps_*.safetensors`
+  for N = 100 ... 600 (53 MB each), also in `<ComfyUI>/models/loras/`.
+
+### Validation (600-step LoRA, strength 1.0, seed 42)
+
+Same prompt as `prompt_only_c` with the trigger word `hero01` in front, same
+negative prompt.
+
+| Image | Setup | Result |
+|---|---|---|
+| `..._lora600_alone.png` | LoRA only, no IP-Adapter | Bench, three-quarter view, outdoors. Jacket dark charcoal, the darkest of all tries but not pure black. Red straps, no watch, no logo. The picture turns almost black-and-white: skin nearly white, heavy ink. The face is not the reference face |
+| `..._lora600_ipa08.png` | LoRA + IP-Adapter 0.8 "ease out" | Face, skin tone and hair closest to the reference of all tries. Zipped hooded jacket, straps with buckles, no watch, no logo. Jacket olive-brown, not black. The pose turned frontal and tighter; the bench is barely in the frame |
+
+Against the earlier tries:
+
+| | Jacket colour | Watch | Chest logo | Line / layout drift |
+|---|---|---|---|---|
+| w08 (IP-Adapter, ease out) | grey | yes | no | none noted |
+| prompt_only_c | grey | no | yes | none noted |
+| i2i from c, denoise 0.35 / 0.50 | grey / grey | no / yes | yes / yes | layout held exactly |
+| LoRA alone | dark charcoal | no | no | colours drain to near monochrome |
+| LoRA + IP-Adapter | olive-brown | no | no | three-quarter view lost, framing tighter |
+
+What this shows: the LoRA removes the invented details (watch, logo) and,
+alone, pulls the jacket towards black; with the IP-Adapter the face is the
+best so far. No single setting gives the reference face, a black jacket and
+the asked-for pose together. "The same character" is not reached; it is
+closer than before. Not tried: other LoRA strengths, the earlier part files
+(100 to 500 steps), more steps or a higher rank, IP-Adapter weights other
+than 0.8 together with the LoRA.
+
+Each image took 31 to 33 s; peak VRAM 6.8 to 6.9 GB.
+
 ## Open, for a decision
 
 - Composition locking (the shot_04 start / end problem) is not shown to work.
