@@ -8,8 +8,9 @@ No image backend is chosen yet; see `docs/research/IMAGE_BACKENDS.md`.
 ## Goal
 
 Test whether an image backend can turn the **one canonical frame** of
-`COMIC_HERO_01` into a **five-view character sheet** without changing who he
-is, what he wears, or how the picture is drawn. The sheet becomes the identity
+`COMIC_HERO_01` into a **three-view character sheet** without changing who he
+is or what he wears, drawn like the approved hand-made turnaround sheet (see
+"Canonical character reference" below). The sheet becomes the identity
 reference for per-shot keyframes (`trailers/trailer_01/shotlist.yaml`, the
 shots with `needs_character_keyframe: true`).
 
@@ -27,16 +28,18 @@ recorded. Suggested: a wide sheet such as 1536x1024.
 
 ## Required views
 
-All five, in one row, same scale, common ground line, neutral standing pose,
-plain light-grey background, whole figure visible:
+All three, side by side, same scale, common ground line, neutral standing
+pose, plain light-grey background, whole figure visible. They are the views
+of the approved reference:
 
 | View | Meaning |
 |---|---|
 | `front` | facing the viewer |
-| `three_quarter_left` | body turned 45 degrees to his left |
-| `three_quarter_right` | body turned 45 degrees to his right |
-| `profile` | exact side view, facing the left edge of the sheet |
+| `three_quarter` | body turned to his left, facing the right side of the sheet |
 | `back` | seen from behind |
+
+Dropped on 2026-10-05 (they were in the earlier five-view plan and are not on
+the approved reference): `three_quarter_right`, `profile`.
 
 ## Fixed outfit (from the canonical frame)
 
@@ -50,15 +53,32 @@ Only what the canonical frame shows is fixed:
 - dark red is the only accent colour
 - no mask, no face covering, no logo, no emblem, no letter, no text
 
-The frame shows him **from behind**. His **face is not defined by it**: the
-first accepted sheet defines the face, which is a human decision.
+The frame shows him **from behind**. His **face is not defined by it**: it is
+the face on the approved turnaround sheet.
 
 ## Style constraints
 
-The look of the canonical frame: strong ink contours with varying line weight,
-controlled cel shading, halftone texture in the shadows, hand-drawn hatching.
-Flat, even lighting for the sheet; the frame's sunset light is not part of the
-character design. No photorealism, no 3D-render look.
+The style target is the approved turnaround sheet, not the earlier "flat,
+even lighting and clean, closed line work". The wording follows turns 3 to 5
+of the prompt chain that produced it
+([`docs/prompts/character_turnaround_hero_01.prompt.txt`](prompts/character_turnaround_hero_01.prompt.txt)):
+
+- **Lighting:** directional studio lighting with real highlights, core
+  shadows and reflected light, identical in all views; not flat, not even. A
+  touch of dark-red rim light on the edges of the hair and the jacket
+  silhouette. The canonical frame's sunset light is not part of the design.
+- **Line work:** hand-inked black ink contours with naturally varying,
+  pressure-dependent line weight; thick outer contours, thinner interior
+  details; ink pooling and nib texture may show. Not uniform.
+- **Under-sketch:** faint construction lines visible in a few places, as if
+  not fully erased.
+- **Shading:** bold flat cel shading blocks on the clothing, coarse halftone
+  screen-tone dots in the mid-tones (not a perfectly uniform dot grid), rough
+  hand-drawn hatching and cross-hatching.
+- **Finish:** deliberately varied across the image, face and torso tighter,
+  other areas looser and more gestural; not uniformly polished.
+- No photorealism, no 3D-render look, no smooth vector render, no soft
+  airbrushed gradients.
 
 ## No franchise motifs
 
@@ -95,10 +115,10 @@ hand in the Gemini app and imported with `scripts/import_reference.py`. Its
 provenance file lies beside it; the prompt chain is
 [`docs/prompts/character_turnaround_hero_01.prompt.txt`](prompts/character_turnaround_hero_01.prompt.txt).
 
-It is **one sheet image**, as this benchmark assumes, with **three views**
-(front, three-quarter, back), not the five listed above. It is the canonical
-reference for who `COMIC_HERO_01` is, including his face. It is not an input
-of this benchmark: `reference_images` still holds only the canonical frame.
+It is **one sheet image** with **three views** (front, three-quarter, back).
+It is the canonical reference for who `COMIC_HERO_01` is, including his face,
+and the benchmark's views and style target follow it. It is not an input of
+this benchmark: `reference_images` still holds only the canonical frame.
 
 ## Open points (why this is a draft)
 
@@ -108,9 +128,9 @@ of this benchmark: `reference_images` still holds only the canonical frame.
    outfit list must say exactly what they are.
 3. Decided: one sheet image, not one image per view.
 4. Which image backend, and at what size.
-5. This draft asks for five views; the approved reference has three. Either
-   the benchmark follows the reference (three views) or stays at five.
-6. The style constraints above ask for flat, even lighting and clean, closed
-   line work; the prompts that produced the approved reference ask for
-   directional and rim lighting and visible under-sketch lines. Which of the
-   two the benchmark should rate against is not decided.
+5. Decided (2026-10-05): three views (front, three-quarter, back), matching
+   the approved reference. `three_quarter_right` and `profile` are dropped.
+6. Decided (2026-10-05): the style target is the approved turnaround sheet
+   (directional lighting, visible under-sketch, varying hand-inked line
+   weight, halftone mid-tones, varied finish), not flat, even lighting and
+   clean, closed line work.

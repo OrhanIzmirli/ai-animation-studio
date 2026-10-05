@@ -47,9 +47,13 @@ def definition():
     return load_definition(REPO_ROOT / "benchmarks" / "definitions" / "character_sheet_hero_01.yaml")
 
 
-def test_one_prompt_per_required_view(definition):
+def test_one_prompt_per_view_of_the_superseded_pack(definition):
     views = sections(SHEET, "View")
-    assert list(views) == definition.composition["views"]  # the same five, in the same order
+    # The pack is superseded and kept for reference: it still holds the five
+    # views of the earlier plan, while the benchmark now asks for three.
+    assert list(views) == ["front", "three_quarter_left", "three_quarter_right", "profile", "back"]
+    assert definition.composition["views"] == ["front", "three_quarter", "back"]
+    assert "SUPERSEDED" in SHEET.read_text(encoding="utf-8")
     for name, body in views.items():
         assert len(prompt_blocks(body)) == 1, name
         assert f"`{name}.png`" in body and f"`{name}.prompt.txt`" in body, name

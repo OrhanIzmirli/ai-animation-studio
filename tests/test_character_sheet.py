@@ -64,14 +64,15 @@ def test_canonical_frame_is_the_only_reference(definition):
     assert definition.image_count == 1  # one run = one sheet
 
 
-def test_all_five_views_are_required(definition):
-    assert definition.composition["views"] == [
-        "front", "three_quarter_left", "three_quarter_right", "profile", "back",
-    ]
+def test_all_three_views_are_required(definition):
+    # The views of the approved hand-made turnaround sheet; the earlier
+    # five-view plan (with three_quarter_right and profile) was dropped.
+    assert definition.composition["views"] == ["front", "three_quarter", "back"]
     prompt = definition.prompt.lower()
-    for phrase in ("front view", "three-quarter view turned to his left",
-                   "three-quarter view turned to his right", "side profile", "back view", "five full-body views"):
+    for phrase in ("front view", "three-quarter view turned to his left", "back view", "three full-body views"):
         assert phrase in prompt, phrase
+    for phrase in ("five", "side profile", "turned to his right"):
+        assert phrase not in prompt, phrase
     assert "missing view" in definition.negative_prompt and "extra view" in definition.negative_prompt
 
 
@@ -95,6 +96,19 @@ def test_style_constraints_follow_the_canonical_look(definition):
         assert phrase in direction, phrase
         assert phrase in definition.prompt.lower(), phrase
     assert "photorealistic" in definition.negative_prompt and "3D render" in definition.negative_prompt
+
+
+def test_style_target_is_the_approved_turnaround_sheet(definition):
+    direction = " ".join(definition.visual_direction).lower()
+    for phrase in ("directional studio lighting", "highlights, core shadows and reflected light",
+                   "varying", "under-sketch", "halftone screen-tone dots in the mid-tones", "varied level of finish"):
+        assert phrase in direction, phrase
+    prompt = definition.prompt.lower()
+    for phrase in ("directional studio lighting", "varying line weight", "under-sketch", "mid-tones", "looser"):
+        assert phrase in prompt, phrase
+    assert "flat even lighting" not in prompt and "no sketch lines" not in direction
+    for phrase in ("flat even lighting", "uniform line weight", "uniformly polished"):
+        assert phrase in definition.negative_prompt, phrase
 
 
 def test_no_franchise_motifs(definition):
