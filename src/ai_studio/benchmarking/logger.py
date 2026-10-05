@@ -4,17 +4,25 @@ Layout: <results_dir>/<benchmark_id>/<run_id>.json
 
 Existing result files are never overwritten: writing a run_id that already
 exists raises FileExistsError.
+
+list_runs leaves out a file it cannot load (truncated, or written by a newer
+schema) and reports it with an UnreadableRecordWarning; load raises.
 """
 
 from __future__ import annotations
 
 import json
 import uuid
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 
 from ai_studio.benchmarking.schema import BenchmarkResult
 from ai_studio.paths import resolve_path
+
+
+class UnreadableRecordWarning(UserWarning):
+    """A record file that list_runs could not load and left out."""
 
 
 def new_run_id() -> str:
@@ -48,7 +56,14 @@ class BenchmarkLogger:
         directory = self.results_dir / benchmark_id
         if not directory.is_dir():
             return []
-        return [
-            BenchmarkResult.from_dict(json.loads(p.read_text(encoding="utf-8")))
-            for p in sorted(directory.glob("*.json"))
-        ]
+        runs = []
+        for path in sorted(directory.glob("*.json")):
+            try:
+                runs.append(BenchmarkResult.from_dict(json.loads(path.read_text(encoding="utf-8"))))
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                # One truncated or newer-schema file must not hide the other runs.
+                warnings.warn(
+                    f"skipped unreadable record {path}: {type(exc).__name__}: {exc}",
+                    UnreadableRecordWarning, stacklevel=2,
+                )
+        return runs

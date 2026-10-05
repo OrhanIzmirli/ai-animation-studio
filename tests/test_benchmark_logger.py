@@ -3,6 +3,7 @@ import json
 import pytest
 
 from ai_studio.benchmarking import SCHEMA_VERSION, BenchmarkLogger, BenchmarkResult, Resolution, new_run_id
+from ai_studio.benchmarking.logger import UnreadableRecordWarning
 
 
 def make_result(**overrides):
@@ -118,3 +119,37 @@ def test_fps_and_frame_count_may_be_unknown(tmp_path):
 def test_new_run_id_is_unique():
     ids = {new_run_id() for _ in range(100)}
     assert len(ids) == 100
+
+
+def test_list_runs_skips_a_truncated_record_and_reports_it(tmp_path):
+    logger = BenchmarkLogger(tmp_path)
+    good = make_result(run_id="run-001")
+    whole = logger.log(make_result(run_id="run-002")).read_text(encoding="utf-8")
+    logger.path_for("bench-001", "run-002").write_text(whole[: len(whole) // 2], encoding="utf-8")  # cut off mid-write
+    logger.log(good)
+
+    with pytest.warns(UnreadableRecordWarning) as caught:
+        runs = logger.list_runs("bench-001")
+    assert runs == [good]
+    assert len(caught) == 1 and "run-002.json" in str(caught[0].message)
+    with pytest.raises(ValueError):  # asking for that one record still fails loudly
+        logger.load("bench-001", "run-002")
+
+
+def test_list_runs_skips_a_record_from_a_newer_schema_and_reports_it(tmp_path):
+    logger = BenchmarkLogger(tmp_path)
+    good = make_result(run_id="run-001")
+    logger.log(good)
+    newer = dict(good.to_dict(), run_id="run-003", schema_version=SCHEMA_VERSION + 1, field_from_the_future=1)
+    logger.path_for("bench-001", "run-003").write_text(json.dumps(newer), encoding="utf-8")
+
+    with pytest.warns(UnreadableRecordWarning, match="run-003.json") as caught:
+        runs = logger.list_runs("bench-001")
+    assert runs == [good] and len(caught) == 1
+
+
+def test_list_runs_without_bad_records_warns_about_nothing(tmp_path, recwarn):
+    logger = BenchmarkLogger(tmp_path)
+    logger.log(make_result())
+    assert len(logger.list_runs("bench-001")) == 1
+    assert not [w for w in recwarn if issubclass(w.category, UnreadableRecordWarning)]
