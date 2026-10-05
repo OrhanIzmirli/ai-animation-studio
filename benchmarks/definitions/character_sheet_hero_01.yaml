@@ -1,0 +1,100 @@
+# Character sheet benchmark 01 - COMIC_HERO_01 turnaround.
+# Full specification and rating criteria: docs/BENCHMARK_CHARACTER_SHEET_HERO_01.md
+#
+# Tests whether an image backend can turn the ONE canonical frame of the hero
+# into a five-view character sheet without changing who he is, what he wears
+# or how the picture is drawn. The sheet is the identity reference for the
+# per-shot keyframes of the trailer.
+#
+# One run = one image: the whole sheet. Size and seed are chosen per run.
+#
+# DRAFT. Not runnable until a human sets "status: ready". Open points are
+# listed under "notes" and in the specification.
+#
+# Paths are relative to the project root.
+# Original character. No existing character, title, logo, costume or
+# signature motif of any franchise.
+
+benchmark_id: character_sheet_hero_01
+task_type: image_generation
+status: draft
+
+# The canonical frame is the only picture of the character. Here it is an
+# identity and style REFERENCE (not a start frame, not an image to edit).
+#   1672x941 PNG, sha256 3a3e76750196317ee5142d7d6d00d2c68af58a993ee54ca8cc9fa665dbf1e0fb
+# Requires a backend that really uses at least one reference image.
+reference_images:
+  - benchmarks/references/comic_hero_01/rooftop_frame_v001.png
+
+image_count: 1
+
+prompt: >-
+  Character sheet (turnaround) of the young man from the reference image,
+  drawn in the same graphic novel style. One sheet with five full-body views
+  of the same character standing in a neutral pose, arms relaxed at his
+  sides, in a single row at the same scale, feet on one common ground line:
+  front view, three-quarter view turned to his left, three-quarter view
+  turned to his right, side profile, back view. Plain light-grey background,
+  flat even lighting, no scenery. He is the same person in every view: a
+  young man with short curly dark hair, wearing a black hooded jacket with
+  the hood down and subtle dark-red accents, dark cargo trousers, white
+  low-top sneakers with dark details, and a black backpack with dark-red
+  straps. His face is uncovered and has a calm, neutral expression. Strong
+  ink contours, controlled cel shading, halftone print texture in the
+  shadows, hand-drawn hatching. Consistent face, hair, proportions and
+  clothing in all five views.
+
+negative_prompt: >-
+  photorealistic, live action, 3D render look, glossy plastic shading, soft
+  airbrushed gradients, blurry, different person between views, changing
+  hairstyle, changing clothing, changing proportions, missing view, extra
+  view, cropped feet, cropped head, dynamic pose, scenery, city background,
+  sunset lighting, extra limbs, deformed hands, extra fingers, text, letters,
+  labels, logo, emblem, symbol on the clothing, watermark, signature, speech
+  bubbles, mask, face covering, goggles, cape, armor, weapon, superhero
+  costume
+
+# --- what the sheet must contain (generic; backends use it as they can) ---
+
+composition:
+  layout: one image, five full-body views in a single row, same scale, common ground line
+  pose: standing, neutral, arms relaxed at the sides, hood down
+  background: plain light grey, no scenery, no cast shadows on a wall
+  views:            # all five are required, in this order, left to right
+    - front
+    - three_quarter_left     # his body turned 45 degrees to his left
+    - three_quarter_right    # his body turned 45 degrees to his right
+    - profile                # exact side view, facing the left edge of the sheet
+    - back
+  framing: every view shows the whole figure, head to shoes, nothing cropped
+
+# Fixed design. Only what is visible in the canonical frame is fixed; it shows
+# him from behind, so the list says so where the frame is silent.
+subject_details:
+  identity: young man, slim build
+  hair: short curly dark hair with volume on top, almost black
+  jacket: black hooded jacket, hood down, loose fit; subtle dark-red accents as plain panels or seam lines
+  backpack: black backpack worn on both shoulders, dark-red straps, small light buckles
+  trousers: dark, loose cargo trousers with a side pocket
+  shoes: white low-top sneakers with dark details and white laces
+  accents: dark red only; no other accent colour
+  face: uncovered; NOT visible in the canonical frame, so the front views define it for the first time
+  forbidden: no mask, no face covering, no logo, no emblem, no letter, no text, no costume, no cape
+
+visual_direction:
+  - graphic novel aesthetic, the same hand as the canonical frame
+  - strong black ink contours with varying line weight
+  - controlled cel shading, few tones per surface
+  - halftone print texture in the shadows
+  - hand-drawn hatch details
+  - flat even lighting for the sheet (the frame's sunset light is not part of the design)
+  - clean, closed line work; no sketch lines, no painterly rendering
+
+notes: |
+  character: COMIC_HERO_01
+  reference_sha256: 3a3e76750196317ee5142d7d6d00d2c68af58a993ee54ca8cc9fa665dbf1e0fb
+  evaluation: CharacterSheetEvaluation (manual, 1-10, higher is better)
+  suggested size: a wide sheet, e.g. 1536x1024 or wider (chosen per run, recorded)
+  open (draft): the face is invented by the first accepted sheet - a human must approve it
+  open (draft): the red marks on the jacket back in the canonical frame are read here as plain accents, not a symbol
+  open (draft): one sheet image vs. one image per view

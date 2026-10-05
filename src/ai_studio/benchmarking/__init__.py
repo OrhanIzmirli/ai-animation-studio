@@ -1,5 +1,10 @@
 """Benchmark schemas, logger and runner."""
 
+from ai_studio.benchmarking.character_sheet_evaluation import (
+    CHARACTER_SHEET_CRITERIA,
+    CharacterSheetEvaluation,
+    CharacterSheetEvaluationStore,
+)
 from ai_studio.benchmarking.comic_evaluation import (
     COMIC_CRITERIA,
     ComicAnimationEvaluation,
@@ -19,6 +24,7 @@ from ai_studio.benchmarking.runner import BenchmarkRunError, BenchmarkRunner
 from ai_studio.benchmarking.schema import SCHEMA_VERSION, BenchmarkResult, Resolution
 
 __all__ = [
+    "CHARACTER_SHEET_CRITERIA",
     "COMIC_CRITERIA",
     "CRITERIA",
     "SCHEMA_VERSION",
@@ -28,6 +34,8 @@ __all__ = [
     "BenchmarkResult",
     "BenchmarkRunError",
     "BenchmarkRunner",
+    "CharacterSheetEvaluation",
+    "CharacterSheetEvaluationStore",
     "ComicAnimationEvaluation",
     "ComicAnimationEvaluationStore",
     "DraftBenchmarkError",
