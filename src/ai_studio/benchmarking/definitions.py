@@ -3,6 +3,8 @@
 A definition fixes WHAT is tested and declares its task_type explicitly:
   video_editing     source video + references + instruction -> BenchmarkRequest
   video_generation  prompt + references + shot controls     -> VideoGenerationRequest
+  image_generation  prompt + references + descriptions      -> ImageGenerationRequest
+  image_editing     source image + instruction (+ mask)     -> ImageEditingRequest
 Per-run choices (seed, output resolution, fps, backend parameters) are
 supplied when it is turned into a request. A pinned fps and the
 duration_tolerance_seconds cannot be overridden per run.
@@ -29,6 +31,7 @@ import yaml
 from ai_studio.benchmarking.request import BenchmarkRequest
 from ai_studio.benchmarking.schema import TASK_TYPES, Resolution, check_file_name_safe
 from ai_studio.generation.capabilities import Capability
+from ai_studio.generation.image import ImageEditingRequest, ImageGenerationRequest
 from ai_studio.generation.request import (
     ShotControl,
     VideoGenerationRequest,
@@ -50,12 +53,27 @@ GENERATION_ONLY_FIELDS = (
     "duration_seconds", "duration_tolerance_seconds", "fps", "start_frame",
     "camera_motion", "subject_motion", "visual_direction",
 )
+IMAGE_GENERATION_FIELDS = ("image_count", "composition", "subject_details", "visual_direction")
+IMAGE_EDITING_FIELDS = ("source_image", "mask", *IMAGE_GENERATION_FIELDS)
+# task_type -> the task-specific fields a definition of that type may set
+TASK_FIELDS = {
+    "video_editing": EDITING_ONLY_FIELDS,
+    "video_generation": GENERATION_ONLY_FIELDS,
+    "image_generation": IMAGE_GENERATION_FIELDS,
+    "image_editing": IMAGE_EDITING_FIELDS,
+}
+_REQUIRED = {
+    "video_editing": ("source_video", "prompt"),
+    "video_generation": ("prompt", "duration_seconds"),
+    "image_generation": ("prompt",),
+    "image_editing": ("source_image", "prompt"),
+}
 
 
 @dataclass(frozen=True, kw_only=True)
 class BenchmarkDefinition:
     benchmark_id: str
-    task_type: str  # "video_generation" | "video_editing"; must be explicit
+    task_type: str  # one of TASK_TYPES; must be explicit
     status: str = "draft"  # "draft" | "ready"; set to ready only by a human
     reference_images: list[str] = field(default_factory=list)
     prompt: str | None = None
@@ -74,7 +92,14 @@ class BenchmarkDefinition:
     start_frame: str | None = None  # conditions frame 0; never also a reference image
     camera_motion: ShotControl = None
     subject_motion: ShotControl = None
-    visual_direction: ShotControl = None
+    visual_direction: ShotControl = None  # also image tasks
+
+    # image tasks only (descriptions: string, list of strings or mapping)
+    image_count: int | None = None  # None: 1
+    composition: ShotControl = None  # what the picture must contain / its layout, e.g. required views
+    subject_details: ShotControl = None  # fixed details of the subject, e.g. the outfit
+    source_image: str | None = None  # image_editing: the picture that is changed
+    mask: str | None = None  # image_editing: region to change
 
     def __post_init__(self) -> None:
         check_file_name_safe("benchmark_id", self.benchmark_id)
@@ -85,11 +110,13 @@ class BenchmarkDefinition:
         for name in ("reference_images", "preserve_regions"):
             if not isinstance(getattr(self, name), list):
                 raise ValueError(f"{name} must be a list")
-        not_applicable = (
-            GENERATION_ONLY_FIELDS if self.task_type == Capability.VIDEO_EDITING.value
-            else EDITING_ONLY_FIELDS
-        )
-        set_fields = [name for name in not_applicable if getattr(self, name) not in (None, [])]
+        allowed = TASK_FIELDS[self.task_type]
+        not_applicable = [
+            name for names in TASK_FIELDS.values() for name in names if name not in allowed
+        ]
+        set_fields = [
+            name for name in dict.fromkeys(not_applicable) if getattr(self, name) not in (None, [])
+        ]
         if set_fields:
             raise ValueError(f"{set_fields} do not apply to task_type {self.task_type!r}")
         if self.duration_seconds is not None and (
@@ -108,15 +135,24 @@ class BenchmarkDefinition:
                 raise ValueError("start_frame must be a non-empty path")
             if self.start_frame in self.reference_images:
                 raise ValueError("start_frame must not also be listed in reference_images")
-        for name in ("camera_motion", "subject_motion", "visual_direction"):
+        for name in ("camera_motion", "subject_motion", "visual_direction", "composition", "subject_details"):
             check_shot_control(name, getattr(self, name))
+        if self.image_count is not None and (
+            not isinstance(self.image_count, int) or isinstance(self.image_count, bool) or self.image_count < 1
+        ):
+            raise ValueError("image_count must be an int >= 1")
+        for name in ("source_image", "mask"):
+            value = getattr(self, name)
+            if value is not None:
+                if not isinstance(value, str) or not value:
+                    raise ValueError(f"{name} must be a non-empty path")
+                if value in self.reference_images:
+                    raise ValueError(f"{name} must not also be listed in reference_images")
 
     @property
     def is_complete(self) -> bool:
         """False while the definition still has placeholders instead of real inputs."""
-        if self.task_type == Capability.VIDEO_EDITING.value:
-            return bool(self.source_video and self.prompt)
-        return bool(self.prompt and self.duration_seconds)
+        return all(getattr(self, name) for name in _REQUIRED[self.task_type])
 
     def to_request(
         self,
@@ -125,16 +161,19 @@ class BenchmarkDefinition:
         output_resolution: Resolution,
         backend_parameters: dict[str, Any] | None = None,
         fps: float | None = None,
-    ) -> BenchmarkRequest | VideoGenerationRequest:
-        """Editing -> BenchmarkRequest; generation -> VideoGenerationRequest
-        (run it with runner.run(request, backend, benchmark_id=definition.benchmark_id))."""
+    ) -> BenchmarkRequest | VideoGenerationRequest | ImageGenerationRequest | ImageEditingRequest:
+        """Video editing -> BenchmarkRequest; video generation ->
+        VideoGenerationRequest; image tasks -> ImageGenerationRequest /
+        ImageEditingRequest (run those with
+        runner.run(request, backend, benchmark_id=definition.benchmark_id)).
+        output_resolution is the size of each image for image tasks."""
         if self.status != "ready":
             raise DraftBenchmarkError(
                 f"benchmark {self.benchmark_id!r} is a draft; set 'status: ready' in its "
                 "definition once its inputs are final (an explicit human decision)"
             )
         if not self.is_complete:
-            required = "source_video and prompt" if self.task_type == "video_editing" else "prompt and duration_seconds"
+            required = " and ".join(_REQUIRED[self.task_type])
             raise ValueError(f"benchmark {self.benchmark_id!r} is incomplete: {required} are required")
         if self.task_type == Capability.VIDEO_EDITING.value:
             if fps is not None:
@@ -149,6 +188,24 @@ class BenchmarkDefinition:
                 seed=seed,
                 backend_parameters=dict(backend_parameters or {}),
             )
+        if self.task_type in (Capability.IMAGE_GENERATION.value, Capability.IMAGE_EDITING.value):
+            if fps is not None:
+                raise ValueError("fps is not an image request field")
+            common = dict(
+                prompt=self.prompt,
+                negative_prompt=self.negative_prompt,
+                reference_images=list(self.reference_images),
+                output_resolution=output_resolution,
+                seed=seed,
+                image_count=self.image_count or 1,
+                composition=self.composition,
+                subject_details=self.subject_details,
+                visual_direction=self.visual_direction,
+                backend_parameters=dict(backend_parameters or {}),
+            )
+            if self.task_type == Capability.IMAGE_GENERATION.value:
+                return ImageGenerationRequest(**common)
+            return ImageEditingRequest(source_image=self.source_image, mask=self.mask, **common)
         if fps is not None and self.fps is not None and fps != self.fps:
             raise ValueError(
                 f"fps {fps} conflicts with the benchmark's pinned fps {self.fps}"

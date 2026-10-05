@@ -1,4 +1,5 @@
-"""GenerationResult: what any backend returns after one generation."""
+"""GenerationResult: what a video backend returns after one generation.
+(Image backends return ai_studio.generation.image.ImageGenerationResult.)"""
 
 from __future__ import annotations
 
@@ -56,6 +57,11 @@ class GenerationResult:
 
     # Set if and only if the request had a start_frame.
     start_frame_conditioning: StartFrameConditioning | None = None
+
+    @property
+    def output_paths(self) -> list[str]:
+        """Every file this result claims to have written (shared with image results)."""
+        return [self.output_video]
 
     def __post_init__(self) -> None:
         for name in ("output_video", "backend_name", "backend_version", "model_name", "model_version"):

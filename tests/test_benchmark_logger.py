@@ -43,7 +43,7 @@ def test_log_writes_json_with_all_fields(tmp_path):
         "status", "failure_stage", "error_type", "error_message",
         "validation_time_seconds", "prepare_time_seconds",
         "verification_time_seconds", "total_time_seconds", "output_video",
-        "task_type", "task_parameters", "start_frame", "output_media",
+        "task_type", "task_parameters", "start_frame", "output_media", "image_output",
     }
     assert set(data) == expected_keys
     assert data["resolution"] == {"width": 1280, "height": 720}

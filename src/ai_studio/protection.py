@@ -3,7 +3,8 @@
 Two safeguards:
 
 1. Read-only run files. Once a run is verified and recorded, its output
-   video and derived start frame are marked read-only (protect_run_files).
+   video (or images) and derived start frame are marked read-only
+   (protect_run_files).
    On Windows a read-only file cannot be deleted or overwritten by normal
    means (os.remove and Explorer's plain delete fail or ask first).
    This guards against accidents; it is not access control: anyone can clear
@@ -84,17 +85,18 @@ def is_read_only(path: str | Path) -> bool:
 
 
 def run_files(record: Any, root: str | Path | None = None) -> list[Path]:
-    """The files of a recorded run that must not change: its output video and
-    its derived start frame (those that exist)."""
+    """The files of a recorded run that must not change: its output video or
+    images and its derived start frame (those that exist)."""
     candidates = [
         getattr(record, "output_video", None),
         (getattr(record, "start_frame", None) or {}).get("derived_file"),
+        *(image["path"] for image in (getattr(record, "image_output", None) or {}).get("images", [])),
     ]
     return [path for item in candidates if item and (path := resolve_path(item, root)).is_file()]
 
 
 def protect_run_files(record: Any, root: str | Path | None = None) -> list[Path]:
-    """Mark a recorded run's output video and derived start frame read-only.
+    """Mark a recorded run's output video / images and derived start frame read-only.
     Returns the files that were protected. Best effort: a file whose
     permissions cannot be changed is skipped."""
     protected = []

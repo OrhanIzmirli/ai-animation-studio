@@ -1,6 +1,6 @@
 """Benchmark result schema.
 
-One BenchmarkResult describes exactly one generation run. Model parameters
+One BenchmarkResult describes exactly one run (video or still image). Model parameters
 (model, model_version, seed, inference_steps, guidance) have no defaults: the
 caller must always pass them explicitly, even when the value is None
 (e.g. a backend that has no guidance scale). This keeps every run reproducible.
@@ -59,6 +59,21 @@ Schema history:
        of allowed values grew: a v8 reader rejects such a record, hence the
        new version. "abandoned" is only valid in v9+ records. Migration:
        none; v1-v8 files load unchanged and keep their version.
+ 10  + still-image tasks. task_type may also be "image_generation" or
+       "image_editing" (v10+ records only).
+       + image_output: what an image run produced, None for video runs:
+         {images: [{path, sha256, width, height}, ...],   measured by the runner
+          seed_used: <int or None>,                        reported by the backend
+          provenance: {...}}                               reported by the model / service
+       width / height are read from the file header (None if the format is
+       not PNG or JPEG). seed_used None means the model had no controllable
+       seed. A successful image run must have image_output with at least one
+       image and no output_video; a video run must not have image_output;
+       failed runs never have it. resolution holds the requested size of
+       each image; fps / frame_count / output_media stay None. Why: a run
+       that produces stills (character sheets, keyframes) has no video to
+       name, and its outputs must be pinned by hash like every other file.
+       Migration: none; v1-v9 files load with image_output=None.
 """
 
 from __future__ import annotations
@@ -70,10 +85,15 @@ from typing import Any
 from ai_studio.media import Resolution  # re-exported: Phase 0-1A import path
 from ai_studio.media_probe import OUTPUT_MEDIA_KEYS
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 STATUSES = ("success", "failed")
-TASK_TYPES = ("video_generation", "video_editing")  # = Capability values
+VIDEO_TASK_TYPES = ("video_generation", "video_editing")
+IMAGE_TASK_TYPES = ("image_generation", "image_editing")  # v10+
+IMAGE_SINCE_VERSION = 10
+TASK_TYPES = VIDEO_TASK_TYPES + IMAGE_TASK_TYPES  # = Capability values
+IMAGE_OUTPUT_KEYS = ("images", "seed_used", "provenance")
+IMAGE_KEYS = ("path", "sha256", "width", "height")
 START_FRAME_KEYS = (
     "path", "sha256", "original_width", "original_height",
     "preprocessing", "effective_width", "effective_height", "derived_file",
@@ -143,6 +163,8 @@ class BenchmarkResult:
     frame_count: int | None = None
     # v8+: measured output video, see OUTPUT_MEDIA_KEYS. Successful runs only.
     output_media: dict[str, Any] | None = None
+    # v10+: the images of an image run, see IMAGE_OUTPUT_KEYS. Successful image runs only.
+    image_output: dict[str, Any] | None = None
 
     # Hardware and cost
     gpu: str | None = None
@@ -185,6 +207,9 @@ class BenchmarkResult:
             raise ValueError(f"task_type must be one of {TASK_TYPES}")
         if self.schema_version >= 6 and self.task_type is None:
             raise ValueError("task_type is required")
+        is_image = self.task_type in IMAGE_TASK_TYPES
+        if is_image and self.schema_version < IMAGE_SINCE_VERSION:
+            raise ValueError(f"task_type {self.task_type!r} needs schema_version >= {IMAGE_SINCE_VERSION}")
         if self.status not in STATUSES:
             raise ValueError(f"status must be one of {STATUSES}")
         if self.status == "failed":
@@ -198,8 +223,17 @@ class BenchmarkResult:
                 raise ValueError("failed run needs error_type")
         elif any((self.failure_stage, self.error_type, self.error_message)):
             raise ValueError("successful run must not have failure fields")
+        elif is_image:
+            if self.image_output is None:
+                raise ValueError("successful image run must have image_output")
         elif self.schema_version >= 5 and not self.output_video:
             raise ValueError("successful run must have output_video")
+        if is_image and self.output_video is not None:
+            raise ValueError("an image run has no output_video; its files are in image_output")
+        if self.image_output is not None:
+            if not is_image or self.status != "success":
+                raise ValueError("only a successful image run may have image_output")
+            self._check_image_output(self.image_output)
         if self.output_video is not None:
             if not isinstance(self.output_video, str) or not self.output_video.strip():
                 raise ValueError("output_video must be a non-empty string or None")
@@ -229,6 +263,31 @@ class BenchmarkResult:
         for name in ("model_parameters", "environment", "input_checksums", "task_parameters"):
             if not isinstance(getattr(self, name), dict):
                 raise ValueError(f"{name} must be a dict")
+
+    @staticmethod
+    def _check_image_output(block: Any) -> None:
+        if not isinstance(block, dict) or set(block) != set(IMAGE_OUTPUT_KEYS):
+            raise ValueError(f"image_output must be a dict with keys {IMAGE_OUTPUT_KEYS}")
+        images = block["images"]
+        if not isinstance(images, list) or not images:
+            raise ValueError("image_output needs at least one image")
+        for image in images:
+            if not isinstance(image, dict) or set(image) != set(IMAGE_KEYS):
+                raise ValueError(f"every image_output image must be a dict with keys {IMAGE_KEYS}")
+            path = image["path"]
+            if not isinstance(path, str) or not path.strip() or "\\" in path:
+                raise ValueError(f"image_output path must be a non-empty string with forward slashes: {path!r}")
+            if not isinstance(image["sha256"], str) or not image["sha256"]:
+                raise ValueError("every image_output image needs its sha256")
+            for name in ("width", "height"):
+                value = image[name]
+                if value is not None and (not isinstance(value, int) or isinstance(value, bool) or value <= 0):
+                    raise ValueError(f"image_output {name} must be a positive int or None")
+        seed_used = block["seed_used"]
+        if seed_used is not None and (not isinstance(seed_used, int) or isinstance(seed_used, bool)):
+            raise ValueError("image_output seed_used must be an int or None")
+        if not isinstance(block["provenance"], dict):
+            raise ValueError("image_output provenance must be a dict")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

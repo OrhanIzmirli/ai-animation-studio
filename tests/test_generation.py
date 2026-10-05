@@ -107,7 +107,9 @@ def test_editing_request_still_requires_source_video():
 # --- capabilities ---
 
 def test_capability_values_are_task_types():
-    assert {c.value for c in Capability} == {"video_generation", "video_editing"}
+    assert {c.value for c in Capability} == {
+        "video_generation", "video_editing", "image_generation", "image_editing",
+    }
 
 
 def test_contracts_declare_one_capability_each():

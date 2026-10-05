@@ -180,7 +180,11 @@ def run_benchmark(
 
     out("status: success")
     media = record.output_media
-    if media:
+    if record.image_output:
+        for image in record.image_output["images"]:
+            size = f"{image['width']}x{image['height']}" if image["width"] else "size not measured"
+            out(f"image: {image['path']} ({size})")
+    elif media:
         out(f"measured: {media['fps']:g} fps, {media['frame_count']} frames, "
             f"{media['duration_seconds']:.3f} s, {media['width']}x{media['height']} ({media['probe']})")
     else:
@@ -190,7 +194,7 @@ def run_benchmark(
         if line.startswith("warning: "):
             out(line)
     written = _written_paths(logger, definition.benchmark_id, run_id, root, out)
-    if metrics:
+    if metrics and not record.image_output:  # the automatic metrics are video metrics
         written += _measure(logger, definition.benchmark_id, run_id, root, out)
     return EXIT_SUCCESS, written
 

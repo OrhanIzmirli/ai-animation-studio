@@ -1,0 +1,91 @@
+{
+  "benchmark_id": "character_sheet_hero_01",
+  "run_id": "20261005T030000Z-aaaa0013",
+  "model": "example-image-model",
+  "model_version": "2026-09",
+  "workflow_version": "wf-1",
+  "seed": 42,
+  "inference_steps": null,
+  "guidance": null,
+  "prompt": "character sheet of a young man with curly dark hair",
+  "negative_prompt": "photorealistic",
+  "source_video": null,
+  "reference_assets": [
+    "benchmarks/references/comic_hero_01/rooftop_frame_v001.png"
+  ],
+  "resolution": {
+    "width": 1536,
+    "height": 1024
+  },
+  "fps": null,
+  "frame_count": null,
+  "gpu": null,
+  "vram_gb": null,
+  "generation_time_seconds": 21.5,
+  "estimated_cost_usd": 0.17,
+  "quality_metrics": {},
+  "human_rating": null,
+  "notes": "warning: backend did not use the requested seed 42 (no controllable seed); the run cannot be repeated from its seed",
+  "timestamp": "2026-10-05T03:00:00+00:00",
+  "schema_version": 10,
+  "model_parameters": {
+    "quality": "high"
+  },
+  "environment": {
+    "os": "Linux"
+  },
+  "backend": "example-image-api",
+  "backend_version": "1.0",
+  "input_checksums": {
+    "benchmarks/references/comic_hero_01/rooftop_frame_v001.png": "3a3e76750196317ee5142d7d6d00d2c68af58a993ee54ca8cc9fa665dbf1e0fb"
+  },
+  "status": "success",
+  "failure_stage": null,
+  "error_type": null,
+  "error_message": null,
+  "validation_time_seconds": 0.5,
+  "prepare_time_seconds": 0.0,
+  "verification_time_seconds": 0.25,
+  "total_time_seconds": 22.25,
+  "output_video": null,
+  "task_type": "image_generation",
+  "task_parameters": {
+    "image_count": 1,
+    "composition": {
+      "layout": "one sheet, five full-body views in a row",
+      "views": [
+        "front",
+        "three-quarter left",
+        "three-quarter right",
+        "profile",
+        "back"
+      ]
+    },
+    "subject_details": [
+      "dark hooded streetwear with subtle dark-red accents"
+    ],
+    "visual_direction": [
+      "graphic novel aesthetic",
+      "strong ink contours"
+    ],
+    "run_purpose": "benchmark"
+  },
+  "start_frame": null,
+  "output_media": null,
+  "image_output": {
+    "images": [
+      {
+        "path": "outputs/character_sheet_hero_01/20261005T030000Z-aaaa0013/image_01.png",
+        "sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "width": 1536,
+        "height": 1024
+      }
+    ],
+    "seed_used": null,
+    "provenance": {
+      "response_id": "resp_example",
+      "revised_prompt": null,
+      "content_credentials": true
+    }
+  }
+}

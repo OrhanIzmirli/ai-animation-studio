@@ -7,7 +7,8 @@ instance.
 
 from __future__ import annotations
 
-from ai_studio.generation.backends.base import VideoBackend
+from ai_studio.generation.backends.base import Backend, VideoBackend
+from ai_studio.generation.backends.fake_image import FakeImageBackend
 from ai_studio.generation.backends.joyai import JoyAIVideoEditBackend
 from ai_studio.generation.backends.kiwi import KiwiEditBackend
 from ai_studio.generation.backends.wan_editctrl import WanEditCtrlBackend
@@ -25,9 +26,22 @@ BACKENDS: dict[str, type[VideoBackend]] = {
 }
 
 
-def get_backend(name: str) -> type[VideoBackend]:
-    """The backend class registered under `name`."""
+# Still-image backends, kept apart from the video ones. Only the model-free
+# fake is registered until a real image backend is chosen.
+IMAGE_BACKENDS: dict[str, type[Backend]] = {
+    "fake-image": FakeImageBackend,
+}
+
+
+def all_backends() -> dict[str, type[Backend]]:
+    """Every registered backend, video and image, by name."""
+    return {**BACKENDS, **IMAGE_BACKENDS}
+
+
+def get_backend(name: str) -> type[Backend]:
+    """The backend class (video or image) registered under `name`."""
+    backends = all_backends()
     try:
-        return BACKENDS[name]
+        return backends[name]
     except KeyError:
-        raise KeyError(f"unknown backend {name!r}; valid names: {', '.join(sorted(BACKENDS))}") from None
+        raise KeyError(f"unknown backend {name!r}; valid names: {', '.join(sorted(backends))}") from None
