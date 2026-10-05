@@ -86,6 +86,45 @@ Available RAM falls to 1 to 2 GB even when 8 GB were free at the start:
 ComfyUI keeps models cached in RAM as long as there is room. Nothing failed
 because of it.
 
+## Image-to-image (second session, same day)
+
+From `sdxl_ipadapter_prompt_only_c.png`, same prompts, IP-Adapter 0.8:
+
+| Image | Denoise | Result |
+|---|---|---|
+| `..._i2i_c_d35.png` | 0.35 | Same picture, slightly harder contrast. Jacket grey, chest logo kept |
+| `..._i2i_c_d42.png` | 0.42 | Not looked at (between the other two) |
+| `..._i2i_c_d50.png` | 0.50 | Same layout; jacket grey; logo kept; a wristwatch comes back |
+
+Image-to-image holds the composition exactly, so it is a working answer to
+"same frame, change one thing" as long as the change is small. It does not
+repair colour or identity: what is wrong in the start picture stays wrong.
+Peak VRAM 6.8 GB, about 34 s per image.
+
+## Character LoRA (started, not finished)
+
+- Training set: `spikes/build_hero_lora_dataset.py` writes eight 1024x1024
+  crops with captions (trigger word `hero01`) to
+  `spikes/output/hero_lora_dataset/`: six from the turnaround sheet (three
+  full figures, three upper bodies; notes, swatches, shoe drawing and
+  signature painted over), one from the rooftop frame, one from the shot_03
+  keyframe. `contact_sheet.png` there shows them. w08 and prompt_only_c are
+  left out on purpose (grey jacket, invented details).
+- Trainer: ComfyUI's own `TrainLoraNode`, driven by
+  `spikes/train_hero_lora_spike.py`. Nothing was installed.
+- Smoke test 1 (10 steps, defaults: checkpoint depth 1, no offloading):
+  **ComfyUI aborted** on the first step, VRAM 7.9 GB, available RAM 0.02 GB.
+- Smoke test 2 (10 steps, `--checkpoint-depth 3 --offloading`): **ran**,
+  4.4 s per step, peak VRAM 7.1 GB, available RAM down to 0.01 GB.
+- Full run (600 steps, rank 8, learning rate 1e-4, same flags): reached step
+  359 of 600 after 23.5 minutes at 4.07 s per step, then the session's
+  background shell was stopped because the machine was critically low on
+  memory. The node only saves at the end, so **no LoRA exists yet**. The run
+  itself had not failed.
+- So local training fits this laptop's GPU, at about 41 minutes for 600
+  steps; the limit met was system RAM while training in the background.
+  No cloud GPU was needed up to this point and none was set up.
+
 ## Open, for a decision
 
 - Composition locking (the shot_04 start / end problem) is not shown to work.

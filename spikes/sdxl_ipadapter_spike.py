@@ -15,6 +15,13 @@ Starts ComfyUI (or reuses a running one), checks that the IPAdapter nodes
 loaded, runs one prompt per IP-Adapter weight (same seed, prompt and
 reference), and reports time and peak VRAM / RAM use per image.
 
+--init-image with --denoise runs image-to-image from that picture instead of
+from noise (low denoise keeps its composition).
+
+--lora applies a LoRA from <ComfyUI>/models/loras to the model (for the
+character LoRA of spikes/train_hero_lora_spike.py); a weight of 0 leaves the
+IP-Adapter out, so the LoRA can be judged on its own.
+
 --control-image adds the Lineart T2I-Adapter: the lines of that image hold
 the composition of the new one. The lines are extracted with ComfyUI's
 built-in Canny node (no preprocessor model is installed) and saved beside
@@ -74,9 +81,11 @@ def clean_reference() -> "Image.Image":
 
 def workflow(
     image_name: str, weight: float, positive: str = POSITIVE, negative: str = NEGATIVE, seed: int = SEED,
-    control: dict | None = None,
+    control: dict | None = None, init_image: str | None = None, denoise: float = 1.0,
+    lora: str | None = None, lora_strength: float = 1.0,
 ) -> dict:
-    """control: {"image": uploaded name, "strength", "end", "canny": (low, high)} or None."""
+    """control: {"image": uploaded name, "strength", "end", "canny": (low, high)} or None.
+    init_image: uploaded name of the picture to start from (image-to-image), with `denoise` < 1."""
     nodes = {
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": CHECKPOINT}},
         "2": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": positive}},
@@ -98,6 +107,20 @@ def workflow(
         "10": {"class_type": "VAEDecode", "inputs": {"samples": ["9", 0], "vae": ["1", 2]}},
         "11": {"class_type": "SaveImage", "inputs": {"images": ["10", 0], "filename_prefix": "ai_studio_sdxl_ipa_spike"}},
     }
+    if lora is not None:
+        nodes["40"] = {"class_type": "LoraLoaderModelOnly", "inputs": {
+            "model": ["1", 0], "lora_name": lora, "strength_model": lora_strength,
+        }}
+        nodes["8"]["inputs"]["model"] = ["40", 0]
+    if weight == 0:  # no IP-Adapter at all
+        for key in ("5", "6", "7", "8"):
+            del nodes[key]
+        nodes["9"]["inputs"]["model"] = ["40", 0] if lora is not None else ["1", 0]
+    if init_image is not None:
+        nodes["30"] = {"class_type": "LoadImage", "inputs": {"image": init_image}}
+        nodes["31"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["30", 0], "vae": ["1", 2]}}
+        nodes["9"]["inputs"]["latent_image"] = ["31", 0]
+        nodes["9"]["inputs"]["denoise"] = denoise
     if control is not None:
         low, high = control["canny"]
         nodes.update({
@@ -171,10 +194,15 @@ def main() -> int:
     parser.add_argument("--control-strength", type=float, default=0.8)
     parser.add_argument("--control-end", type=float, default=1.0, help="fraction of the steps the adapter acts on")
     parser.add_argument("--canny", type=float, nargs=2, default=[0.4, 0.8], metavar=("LOW", "HIGH"))
+    parser.add_argument("--lora", default=None, help="LoRA file name in <ComfyUI>/models/loras")
+    parser.add_argument("--lora-strength", type=float, default=1.0)
+    parser.add_argument("--positive", default=None, help="replace the whole positive prompt")
+    parser.add_argument("--init-image", default=None, help="start from this picture (image-to-image)")
+    parser.add_argument("--denoise", type=float, default=1.0, help="with --init-image: how much of it is redrawn (0-1)")
     args = parser.parse_args()
     if args.tag and len(args.weights) != 1:
         parser.error("--tag needs exactly one weight")
-    positive = POSITIVE + (", " + args.positive_add if args.positive_add else "")
+    positive = (args.positive or POSITIVE) + (", " + args.positive_add if args.positive_add else "")
     negative = NEGATIVE + (", " + args.negative_add if args.negative_add else "")
     report_name = f"report_{args.tag}.json" if args.tag else "report.json"
     out = Path(args.out)
@@ -191,6 +219,8 @@ def main() -> int:
         "weight_type": WEIGHT_TYPE, "images": [],
         "width": WIDTH, "height": HEIGHT, "steps": STEPS, "cfg": CFG, "seed": args.seed,
         "positive": positive, "negative": negative, "reference": str(REFERENCE.relative_to(ROOT)),
+        "init_image": args.init_image, "denoise": args.denoise if args.init_image else 1.0,
+        "lora": args.lora, "lora_strength": args.lora_strength if args.lora else None,
         "control": None if args.control_image is None else {
             "adapter": T2I_LINEART, "lines_from": args.control_image, "line_extractor": "ComfyUI Canny node",
             "canny": args.canny, "strength": args.control_strength, "end": args.control_end,
@@ -222,10 +252,16 @@ def main() -> int:
                 "image": client.upload_image(Path(args.control_image), "ai_studio_sdxl_ipa_spike_control.png"),
                 "strength": args.control_strength, "end": args.control_end, "canny": tuple(args.canny),
             }
+        init_name = None
+        if args.init_image is not None:
+            init_name = client.upload_image(Path(args.init_image), "ai_studio_sdxl_ipa_spike_init.png")
         monitor.start()
         for weight in args.weights:
             started = time.perf_counter()
-            prompt_id = client.queue_prompt(workflow(image_name, weight, positive, negative, args.seed, control))
+            prompt_id = client.queue_prompt(workflow(
+                image_name, weight, positive, negative, args.seed, control, init_name, args.denoise,
+                args.lora, args.lora_strength,
+            ))
             outputs = client.wait_for_prompt(prompt_id, timeout_seconds=1800)
             seconds = round(time.perf_counter() - started, 1)  # the first image includes loading the models
             name = f"sdxl_ipadapter_{args.tag}" if args.tag else f"sdxl_ipadapter_test_w{round(weight * 10):02d}"
