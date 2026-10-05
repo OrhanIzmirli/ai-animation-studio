@@ -58,6 +58,8 @@ benchmarks/references/**
 !benchmarks/references/**/
 !benchmarks/references/**/.gitkeep
 !benchmarks/references/**/README.md
+# Provenance of hand-imported reference images (scripts/import_reference.py) is tracked.
+!benchmarks/references/**/*.provenance.json
 
 # Local machine configuration (paths to tools installed outside the repo).
 configs/*.local.yaml

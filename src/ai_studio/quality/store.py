@@ -40,6 +40,7 @@ from ai_studio.quality.frames import (
     ffmpeg_version,
 )
 from ai_studio.quality.metrics import METRICS_VERSION, compute_metrics, transition_diffs
+from ai_studio.quality.regions import REGION_ANALYSIS_WIDTH, AnalysisRegions, region_metrics
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -65,6 +66,10 @@ class VideoMetricsRecord:
     # None: the run's own output video. Otherwise the derived variant measured,
     # e.g. "post/comic_finish_v1" (absent in files written before variants existed).
     variant: str | None = None
+    # Metrics v3+: how each declared analysis region is drawn compared with the
+    # rest of the frame (ai_studio.quality.regions.region_metrics). None when
+    # no regions were declared, and in files written before version 3.
+    region_metrics: dict[str, Any] | None = None
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def __post_init__(self) -> None:
@@ -87,6 +92,11 @@ class VideoMetricsRecord:
             raise ValueError("tool_versions must be a dict with numpy and ffmpeg")
         if self.variant is not None and (not isinstance(self.variant, str) or not self.variant.strip()):
             raise ValueError("variant must be a non-empty string or None")
+        if self.region_metrics is not None and (
+            not isinstance(self.region_metrics, dict)
+            or not {"regions", "rest", "ratios"} <= set(self.region_metrics)
+        ):
+            raise ValueError("region_metrics must be a dict with regions, rest and ratios, or None")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -104,14 +114,20 @@ def measure_video(
     reference_image: str | Path | None = None,
     analysis_width: int = DEFAULT_ANALYSIS_WIDTH,
     variant: str | None = None,
+    regions: AnalysisRegions | None = None,
 ) -> VideoMetricsRecord:
     """Decode `video` and compute every metric. `reference_image` is the
     start frame as the model received it (for start_frame_psnr), or None.
-    `variant` names a derived video (None: the run's own output)."""
+    `variant` names a derived video (None: the run's own output). `regions`
+    are the benchmark's analysis regions; with them the record also gets
+    region_metrics (measured in a second decode at REGION_ANALYSIS_WIDTH)."""
     video = Path(video)
     frames = decode_video(video, analysis_width=analysis_width)
     height, width = frames.shape[1:3]
     reference = None if reference_image is None else decode_image(reference_image, (width, height))
+    regional = None
+    if regions is not None:
+        regional = region_metrics(decode_video(video, analysis_width=REGION_ANALYSIS_WIDTH), regions)
     return VideoMetricsRecord(
         benchmark_id=benchmark_id,
         run_id=run_id,
@@ -122,6 +138,7 @@ def measure_video(
         per_transition_diffs=[round(float(v), 4) for v in transition_diffs(frames)],
         tool_versions={"numpy": np.__version__, "ffmpeg": ffmpeg_version()},
         variant=variant,
+        region_metrics=regional,
     )
 
 
@@ -152,11 +169,12 @@ class VideoMetricsStore:
 
     def measure_run(
         self, benchmark_id: str, run_id: str, root: str | Path | None = None,
-        *, analysis_width: int = DEFAULT_ANALYSIS_WIDTH,
+        *, analysis_width: int = DEFAULT_ANALYSIS_WIDTH, regions: AnalysisRegions | None = None,
     ) -> VideoMetricsRecord:
         """Measure a run's video (paths in the run record are relative to the
         project root) and save the result. Refuses if this run already has
-        metrics of the current version."""
+        metrics of the current version. `regions`: the benchmark's analysis
+        regions, if it declares any."""
         run = self.measurable_run(benchmark_id, run_id)
         if self.exists(benchmark_id, run_id):
             raise FileExistsError(f"run {benchmark_id}/{run_id} already has metrics v{METRICS_VERSION}")
@@ -170,7 +188,7 @@ class VideoMetricsStore:
             reference = None
         record = measure_video(
             video, benchmark_id=benchmark_id, run_id=run_id, reference_image=reference,
-            analysis_width=analysis_width,
+            analysis_width=analysis_width, regions=regions,
         )
         self.save(record)
         return record

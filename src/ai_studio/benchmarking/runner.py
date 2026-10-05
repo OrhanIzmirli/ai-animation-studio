@@ -1,8 +1,9 @@
 """Run one task request on one backend and log the result.
 
-One runner for every capability. It knows only the VideoBackend contract and
-the small task-request protocol shared by BenchmarkRequest (editing) and
-VideoGenerationRequest (generation):
+One runner for every capability. It knows only the backend contract and
+the small task-request protocol shared by BenchmarkRequest (video editing),
+VideoGenerationRequest and the image requests (ImageGenerationRequest,
+ImageEditingRequest):
 
     capability              which Capability the request needs
     input_paths             files that must exist and must not be modified
@@ -47,8 +48,34 @@ Exceptions are never swallowed. Not recorded, and raised as-is:
   - UnsupportedCapabilityError: backend lacks the request's capability
   - BackendNotInstalledError: a configuration problem, not a model result
   - KeyboardInterrupt / SystemExit (only Exception subclasses are caught)
+After a successful run is recorded, its output video and derived start frame
+are marked read-only (ai_studio.protection), so they cannot be deleted or
+overwritten by accident.
+
+An in-progress marker (ai_studio.benchmarking.in_progress) is written into the
+output directory right before generation and removed when the run's record,
+success or failed, is saved. A run that dies in between leaves the marker
+behind; scripts/find_abandoned_runs.py finds it and can record the run as
+failed with failure_stage "abandoned".
+
 Timeouts are the backend's job (only it can stop its own inference); a
 TimeoutError raised by the backend is recorded like any other failure.
+
+Still-image tasks run through the same stages. The differences, all decided
+by generic fields and never by a model name:
+  - the backend returns an ImageGenerationResult (a video task: a
+    GenerationResult); the other type fails verification
+  - before anything runs: more reference_images than the backend's
+    max_reference_images, or a mask on a backend without supports_mask,
+    raises UnsupportedCapabilityError (not recorded)
+  - verification: every output image is a file inside the output directory,
+    and there are exactly image_count of them
+  - instead of the media probe, each image is hashed and its size read from
+    the file header; a size different from output_resolution is a warning
+  - the backend reports the seed the model really used (seed_used); if that
+    is not the requested seed, the record gets a warning
+  - the record has image_output {images, seed_used, provenance} and no
+    output_video / output_media / fps / frame_count
 """
 
 from __future__ import annotations
@@ -64,6 +91,12 @@ from typing import Any
 
 from ai_studio.benchmarking.definitions import BenchmarkDefinition, DraftBenchmarkError
 from ai_studio.benchmarking.environment import collect_environment
+from ai_studio.benchmarking.in_progress import (
+    ABANDONED_ERROR_TYPE,
+    ABANDONED_STAGE,
+    remove_marker,
+    write_marker,
+)
 from ai_studio.benchmarking.logger import BenchmarkLogger, new_run_id
 from ai_studio.benchmarking.request import BenchmarkRequest
 from ai_studio.benchmarking.schema import BenchmarkResult, Resolution, check_file_name_safe
@@ -72,12 +105,14 @@ from ai_studio.generation.backends.base import (
     BackendNotInstalledError,
     VideoBackend,
 )
-from ai_studio.generation.capabilities import UnsupportedCapabilityError
+from ai_studio.generation.capabilities import IMAGE_CAPABILITIES, UnsupportedCapabilityError
+from ai_studio.generation.image import ImageEditingRequest, ImageGenerationRequest, ImageGenerationResult
 from ai_studio.generation.request import VideoGenerationRequest
 from ai_studio.generation.result import GenerationResult
 from ai_studio.media import image_dimensions
 from ai_studio.media_probe import ProbeUnavailableError, VideoInfo, ffprobe_video
 from ai_studio.paths import project_root, resolve_path, to_project_relative
+from ai_studio.protection import protect_run_files
 
 MAX_ERROR_MESSAGE_CHARS = 4000
 # Why a run was made; stored as task_parameters["run_purpose"]. Only
@@ -85,7 +120,8 @@ MAX_ERROR_MESSAGE_CHARS = 4000
 RUN_PURPOSES = ("benchmark", "smoke", "experiment")
 FPS_TOLERANCE = 0.01  # 23.976 != 24
 
-TaskRequest = BenchmarkRequest | VideoGenerationRequest
+TaskRequest = BenchmarkRequest | VideoGenerationRequest | ImageGenerationRequest | ImageEditingRequest
+TaskResult = GenerationResult | ImageGenerationResult
 
 
 class BenchmarkRunError(RuntimeError):
@@ -127,10 +163,11 @@ class _Run:
     estimated_cost_usd: float | None
     notes: str
     purpose: str = "benchmark"
-    result: GenerationResult | None = None
+    result: TaskResult | None = None
     checksums: dict[str, str] = dataclasses.field(default_factory=dict)
     timings: dict[str, float] = dataclasses.field(default_factory=dict)
-    media: VideoInfo | None = None  # measured output; None if not measured
+    media: VideoInfo | None = None  # measured output video; None if not measured
+    images: list[dict[str, Any]] | None = None  # measured output images (image tasks)
     warnings: list[str] = dataclasses.field(default_factory=list)  # runner's own
 
 
@@ -208,6 +245,18 @@ class BenchmarkRunner:
                 f"{type(backend).__name__} does not declare start-frame conditioning "
                 "(supports_start_frame); a start_frame is never downgraded to a reference image"
             )
+        # Image contracts declare how many reference images they can use and
+        # whether they take a mask; nothing is quietly dropped.
+        limit = getattr(backend, "max_reference_images", None)
+        if limit is not None and len(request.reference_images) > limit:
+            raise UnsupportedCapabilityError(
+                f"{type(backend).__name__} uses at most {limit} reference image(s), "
+                f"the request has {len(request.reference_images)}"
+            )
+        if getattr(request, "mask", None) and not getattr(backend, "supports_mask", False):
+            raise UnsupportedCapabilityError(
+                f"{type(backend).__name__} does not declare mask support (supports_mask)"
+            )
         run_id = run_id or new_run_id()
         check_file_name_safe("run_id", run_id)
         output_dir = self.outputs_dir / benchmark_id / run_id
@@ -239,11 +288,15 @@ class BenchmarkRunner:
 
             enter("generation")
             output_dir.mkdir(parents=True, exist_ok=False)  # never reuse an output dir
+            self._mark_in_progress(run, output_dir)
             run.result = backend.generate(resolved, output_dir)
 
             enter("verification")
             self._verify(run.result, output_dir, resolved, run.checksums, self.root)
-            run.media = self._measure_output(run.result, resolved, run.warnings)
+            if isinstance(run.result, ImageGenerationResult):
+                run.images = self._measure_images(run.result, resolved, run.warnings)
+            else:
+                run.media = self._measure_output(run.result, resolved, run.warnings)
             enter("done")
         except BackendNotInstalledError:
             raise
@@ -262,6 +315,10 @@ class BenchmarkRunner:
         except Exception as exc:
             failed = self._save_failure(run, exc, "logging")
             raise BenchmarkRunError("logging", failed, exc) from exc
+        remove_marker(output_dir)
+        # Verified and recorded: from now on the run's video and derived start
+        # frame must not change. Read-only guards them against accidents.
+        protect_run_files(record, self.root)
         return record
 
     # --- helpers ---
@@ -296,14 +353,20 @@ class BenchmarkRunner:
         checksums: dict[str, str],
         root: Path,
     ) -> None:
-        if not isinstance(result, GenerationResult):
-            raise TypeError(f"backend returned {type(result).__name__}, expected GenerationResult")
-        output = resolve_path(result.output_video, root)
-        if not output.is_relative_to(output_dir.resolve()) or not output.is_file():
-            raise RuntimeError(f"backend output must be a file inside {output_dir}: {output}")
+        expected = ImageGenerationResult if request.capability in IMAGE_CAPABILITIES else GenerationResult
+        if not isinstance(result, expected):
+            raise TypeError(f"backend returned {type(result).__name__}, expected {expected.__name__}")
+        for item in result.output_paths:
+            output = resolve_path(item, root)
+            if not output.is_relative_to(output_dir.resolve()) or not output.is_file():
+                raise RuntimeError(f"backend output must be a file inside {output_dir}: {output}")
+        if isinstance(result, ImageGenerationResult) and len(result.output_images) != request.image_count:
+            raise RuntimeError(
+                f"request asked for {request.image_count} image(s), backend returned {len(result.output_images)}"
+            )
         if {p: sha256_file(p) for p in request.input_paths} != checksums:
             raise RuntimeError("backend modified an input file; original inputs must be preserved")
-        conditioning = result.start_frame_conditioning
+        conditioning = getattr(result, "start_frame_conditioning", None)
         if getattr(request, "start_frame", None):
             if conditioning is None:
                 raise RuntimeError(
@@ -360,15 +423,67 @@ class BenchmarkRunner:
             )
         return info
 
+    def _measure_images(
+        self, result: ImageGenerationResult, request: TaskRequest, warnings: list[str],
+    ) -> list[dict[str, Any]]:
+        """Hash every output image and read its size from the file header.
+        Appends non-fatal findings to `warnings`."""
+        target = request.output_resolution
+        images = []
+        for item in result.output_images:
+            path = resolve_path(item, self.root)
+            relative = to_project_relative(path, self.root)
+            try:
+                size = image_dimensions(path)
+            except OSError:
+                size = None
+            if size is None:
+                warnings.append(f"size of {relative} not measured (not a PNG or JPEG header)")
+            elif (size.width, size.height) != (target.width, target.height):
+                warnings.append(
+                    f"measured size {size.width}x{size.height} of {relative} differs from requested "
+                    f"{target.width}x{target.height}"
+                )
+            images.append({
+                "path": relative, "sha256": sha256_file(path),
+                "width": size.width if size else None, "height": size.height if size else None,
+            })
+        if result.seed_used != request.seed:
+            used = "no controllable seed" if result.seed_used is None else f"seed {result.seed_used}"
+            warnings.append(
+                f"backend did not use the requested seed {request.seed} ({used}); "
+                "the run cannot be repeated from its seed"
+            )
+        return images
+
     def _collect_environment(self) -> dict[str, Any]:
         try:
             return dict(self.environment_collector())
         except Exception as exc:
             return {"collection_error": f"{_error_type(exc)}: {exc}"}
 
-    def _build_record(self, run: _Run, failure: dict[str, Any] | None = None) -> BenchmarkResult:
+    def _mark_in_progress(self, run: _Run, output_dir: Path) -> None:
+        """Write the in-progress marker: the record to save if this run is
+        abandoned. The environment is not collected here (that happens once,
+        when the real record is built)."""
+        failure = {
+            "status": "failed",
+            "failure_stage": ABANDONED_STAGE,
+            "error_type": ABANDONED_ERROR_TYPE,
+            "error_message": None,
+        }
+        record = self._build_record(run, failure, environment={})
+        write_marker(output_dir, dataclasses.replace(record, model_parameters=_json_safe(record.model_parameters)))
+
+    def _build_record(
+        self, run: _Run, failure: dict[str, Any] | None = None, environment: dict[str, Any] | None = None,
+    ) -> BenchmarkResult:
         request, meta = run.request, run.meta
-        valid_result = run.result if isinstance(run.result, GenerationResult) else None
+        # Only a result of the type this task returns is trusted for the record.
+        is_image = request.capability in IMAGE_CAPABILITIES
+        expected = ImageGenerationResult if is_image else GenerationResult
+        valid_result = run.result if isinstance(run.result, expected) else None
+        image_result = valid_result if is_image else None
         effective = valid_result.parameters if valid_result else {}
         model_parameters = {**request.backend_parameters, **effective}
 
@@ -387,7 +502,7 @@ class BenchmarkRunner:
                     f"backend-reported generation time: {valid_result.generation_time_seconds:.3f}s"
                 )
 
-        environment = self._collect_environment()
+        environment = self._collect_environment() if environment is None else dict(environment)
         if valid_result:
             environment.update(valid_result.environment)
 
@@ -411,7 +526,16 @@ class BenchmarkRunner:
             negative_prompt=request.negative_prompt,
             source_video=to_project_relative(source_video, self.root) if source_video else None,
             output_video=(
-                to_project_relative(valid_result.output_video, self.root) if valid_result else None
+                to_project_relative(valid_result.output_video, self.root)
+                if valid_result and not image_result else None
+            ),
+            image_output=(
+                {
+                    "images": run.images,
+                    "seed_used": image_result.seed_used,
+                    "provenance": _json_safe(image_result.provenance),
+                }
+                if image_result and run.images and not failure else None
             ),
             reference_assets=[to_project_relative(p, self.root) for p in request.reference_images],
             input_checksums={to_project_relative(p, self.root): h for p, h in run.checksums.items()},
@@ -419,11 +543,8 @@ class BenchmarkRunner:
             resolution=request.output_resolution,
             # Measured when available (only on success), else backend-reported.
             output_media=run.media.to_record() if run.media and not failure else None,
-            fps=run.media.fps if run.media else (valid_result.fps if valid_result else None),
-            frame_count=(
-                run.media.frame_count if run.media
-                else (valid_result.frame_count if valid_result else None)
-            ),
+            fps=run.media.fps if run.media else getattr(valid_result, "fps", None),
+            frame_count=run.media.frame_count if run.media else getattr(valid_result, "frame_count", None),
             gpu=environment.get("gpu_model"),
             vram_gb=environment.get("vram_gb"),
             validation_time_seconds=run.timings.get("validation"),
@@ -436,7 +557,7 @@ class BenchmarkRunner:
             notes="\n".join(line for line in note_lines if line),
         )
 
-    def _start_frame_record(self, run: _Run, result: GenerationResult | None) -> dict[str, Any] | None:
+    def _start_frame_record(self, run: _Run, result: TaskResult | None) -> dict[str, Any] | None:
         start_frame = getattr(run.request, "start_frame", None)
         if not start_frame:
             return None
@@ -445,7 +566,7 @@ class BenchmarkRunner:
             original = image_dimensions(absolute)
         except OSError:
             original = None
-        conditioning = result.start_frame_conditioning if result else None
+        conditioning = getattr(result, "start_frame_conditioning", None)
         return {
             "path": to_project_relative(absolute, self.root),
             # Checksum taken before generation; None if validation failed first.
@@ -479,6 +600,7 @@ class BenchmarkRunner:
                 environment=_json_safe(record.environment),
             )
             self.logger.log(record)  # "x" mode: never overwrites
+            remove_marker(self.outputs_dir / run.benchmark_id / run.run_id)
             return record
         except Exception as save_exc:
             exc.add_note(f"failed-run record could not be saved: {_error_type(save_exc)}: {save_exc}")

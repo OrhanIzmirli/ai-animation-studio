@@ -335,6 +335,8 @@ added later with their defaults.
 | 6 | + `task_type` (required), `task_parameters` | `task_type: null` (unknown), `task_parameters: {}` |
 | 7 | + `start_frame` (image-to-video reproducibility block) | `start_frame: null` |
 | 8 | + `output_media` (measured output video); `fps`/`frame_count` are measured values when a measurement exists | `output_media: null`; `fps`/`frame_count` stay backend-reported |
+| 9 | `failure_stage` may be `abandoned` (a run that started generating and never got a record; written afterwards by `scripts/find_abandoned_runs.py`) | unchanged; `abandoned` is valid only in v9+ records |
+| 10 | still-image tasks: `task_type` may be `image_generation` / `image_editing`; + `image_output` (`images` with path, sha256, width, height; `seed_used`; `provenance`) | `image_output: null`; image task types are valid only in v10+ records |
 
 v5 migration: no action is needed. From v5 on, a successful record **must**
 have `output_video`; the rule is checked only for records with
@@ -351,6 +353,16 @@ v8 migration: no action is needed. `output_media` is allowed only on
 successful records and must have exactly the keys in
 `ai_studio.media_probe.OUTPUT_MEDIA_KEYS`. In v1–v7 records `fps` and
 `frame_count` are whatever the backend reported and were never checked.
+
+v9 migration: no action is needed. No field was added; the set of allowed
+`failure_stage` values grew, which an older reader rejects, hence the version.
+
+v10 migration: no action is needed. A successful image run must have
+`image_output` (at least one image) and no `output_video`; a video run must
+not have `image_output`; failed runs never have it. The images are hashed and
+measured by the runner; `seed_used` and `provenance` are what the backend
+reported. For image runs `resolution` is the requested size of each image and
+`fps` / `frame_count` / `output_media` stay `null`.
 
 Frozen example records for every version live in `tests/fixtures/schema/`
 and must keep loading. Never edit them; add a new fixture for a new version.

@@ -1,12 +1,22 @@
 """Generic backend contracts, one per capability.
 
 A backend adapts one model/workflow. Nothing outside the adapter knows how the
-model works: the runner passes a request in and gets a GenerationResult out.
+model works: the runner passes a request in and gets a result out
+(GenerationResult for video, ImageGenerationResult for images).
 Backend-specific settings travel inside request.backend_parameters.
 
     VideoBackend             common lifecycle, capability declaration
     ├── VideoGenerationBackend   VideoGenerationRequest -> new video
     └── VideoEditingBackend      BenchmarkRequest (source video) -> edited video
+
+Still images have the same kind of contracts beside the video ones:
+
+    Backend
+    +-- ImageGenerationBackend   ImageGenerationRequest -> new image(s)
+    +-- ImageEditingBackend      ImageEditingRequest (source image) -> edited image(s)
+
+Backend is the common root. VideoBackend is its historical name and stays as
+an alias, so existing code and type hints keep working.
 
 A backend supports a capability by implementing that contract. A model that
 naturally does both subclasses both contracts and handles each request type
@@ -18,7 +28,7 @@ Lifecycle, as driven by BenchmarkRunner:
     metadata()            -> identify backend, model and workflow versions
     validate_inputs(req)  -> raise ValueError if this backend cannot run req
     prepare()             -> load weights / warm up (may be expensive)
-    generate(req, dir)    -> write the output video inside dir, return result
+    generate(req, dir)    -> write the output (video or images) inside dir, return result
 """
 
 from __future__ import annotations
@@ -29,10 +39,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from ai_studio.generation.capabilities import Capability
+from ai_studio.generation.image import ImageGenerationResult
 from ai_studio.generation.result import GenerationResult
 
 if TYPE_CHECKING:
     from ai_studio.benchmarking.request import BenchmarkRequest
+    from ai_studio.generation.image import ImageEditingRequest, ImageGenerationRequest
     from ai_studio.generation.request import VideoGenerationRequest
 
 
@@ -54,7 +66,7 @@ class BackendMetadata:
                 raise ValueError(f"{name} must be a non-empty string")
 
 
-class VideoBackend(ABC):
+class Backend(ABC):
     # Capabilities provided by this class's contract(s). Derived automatically;
     # see __init_subclass__.
     capabilities: ClassVar[frozenset[Capability]] = frozenset()
@@ -95,8 +107,11 @@ class VideoBackend(ABC):
         """Load the model. Called once before generate(); may be expensive."""
 
     @abstractmethod
-    def generate(self, request: Any, output_dir: Path) -> GenerationResult:
-        """Produce the video. It must be written inside output_dir."""
+    def generate(self, request: Any, output_dir: Path) -> GenerationResult | ImageGenerationResult:
+        """Produce the output. Every file must be written inside output_dir."""
+
+
+VideoBackend = Backend  # historical name of the common root
 
 
 class VideoGenerationBackend(VideoBackend):
@@ -126,7 +141,43 @@ class VideoEditingBackend(VideoBackend):
         ...
 
 
-class NotInstalledBackend(VideoBackend):
+class ImageGenerationBackend(Backend):
+    """Text / reference images -> new still image(s). No source image.
+
+    Reference images carry identity and style. A backend declares how many it
+    can really use (max_reference_images, default 0 = none); a request with
+    more is refused before anything runs, it is never quietly truncated.
+    The result reports the seed the model actually used (seed_used; None if
+    the model has no controllable seed) and whatever provenance the model or
+    service reported.
+    """
+
+    _contract_capability = Capability.IMAGE_GENERATION
+    max_reference_images: ClassVar[int] = 0
+
+    @abstractmethod
+    def generate(self, request: ImageGenerationRequest, output_dir: Path) -> ImageGenerationResult:
+        ...
+
+
+class ImageEditingBackend(Backend):
+    """Source image / reference images / instruction -> edited image(s).
+
+    The source image is the picture that is changed in place; it is never
+    just another reference. A request with a mask (the region to change) may
+    only run on a backend that sets supports_mask = True.
+    """
+
+    _contract_capability = Capability.IMAGE_EDITING
+    max_reference_images: ClassVar[int] = 0
+    supports_mask: ClassVar[bool] = False
+
+    @abstractmethod
+    def generate(self, request: ImageEditingRequest, output_dir: Path) -> ImageGenerationResult:
+        ...
+
+
+class NotInstalledBackend(Backend):
     """Base for candidate backends that are registered but not installed yet.
     Combine with the contract(s) the candidate is expected to implement."""
 
@@ -141,7 +192,7 @@ class NotInstalledBackend(VideoBackend):
     def prepare(self) -> None:
         raise self._not_installed()
 
-    def generate(self, request: Any, output_dir: Path) -> GenerationResult:
+    def generate(self, request: Any, output_dir: Path) -> GenerationResult | ImageGenerationResult:
         raise self._not_installed()
 
     def _not_installed(self) -> BackendNotInstalledError:

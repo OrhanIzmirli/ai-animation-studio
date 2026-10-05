@@ -59,6 +59,7 @@ from ai_studio.generation.backends.wan_ti2v import (
 )
 from ai_studio.generation.request import VideoGenerationRequest
 from ai_studio.generation.result import GenerationResult
+from ai_studio.protection import safe_rmdir, safe_rmtree, safe_unlink
 from ai_studio.system_memory import LowestAvailableRam, available_ram_gb, total_ram_gb
 
 BACKEND_VERSION = "comfyui-0.1"
@@ -520,17 +521,20 @@ class WanComfyUIBackend(VideoGenerationBackend):
     @staticmethod
     def _clean_up(config: ComfyUIConfig, image_name: str, run_key: str) -> None:
         """Remove this run's copies from ComfyUI's own input / output folders
-        (best effort; only paths this adapter created, inside comfyui_dir)."""
+        (best effort; only paths this adapter created, inside comfyui_dir).
+        Deletion goes through ai_studio.protection: nothing under the
+        project's outputs/ or benchmarks/ is ever removed here, whatever
+        comfyui_dir is configured to be."""
         frames_dir = config.comfyui_dir / "output" / OUTPUT_PREFIX / run_key
         uploaded = config.comfyui_dir / "input" / image_name
         try:
             if frames_dir.is_dir() and frames_dir.resolve().is_relative_to(config.comfyui_dir.resolve()):
-                shutil.rmtree(frames_dir)
+                safe_rmtree(frames_dir)
                 if not any(frames_dir.parent.iterdir()):
-                    frames_dir.parent.rmdir()
+                    safe_rmdir(frames_dir.parent)
             if uploaded.is_file() and uploaded.name.startswith("ai_studio_"):
-                uploaded.unlink()
-        except OSError:
+                safe_unlink(uploaded)
+        except OSError:  # includes ProtectedPathError: clean-up is best effort
             pass
 
 

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from ai_studio.benchmarking import BenchmarkRequest, BenchmarkRunError, Resolution
+from ai_studio.benchmarking import SCHEMA_VERSION, BenchmarkRequest, BenchmarkRunError, Resolution
 from ai_studio.generation.backends import (
     BackendMetadata,
     JoyAIVideoEditBackend,
@@ -107,7 +107,9 @@ def test_editing_request_still_requires_source_video():
 # --- capabilities ---
 
 def test_capability_values_are_task_types():
-    assert {c.value for c in Capability} == {"video_generation", "video_editing"}
+    assert {c.value for c in Capability} == {
+        "video_generation", "video_editing", "image_generation", "image_editing",
+    }
 
 
 def test_contracts_declare_one_capability_each():
@@ -191,7 +193,7 @@ def test_generation_run_records_everything(runner, generation_request_factory, i
     )
 
     data = json.loads(runner.logger.path_for(BENCH, "run-1").read_text(encoding="utf-8"))
-    assert data["schema_version"] == 8
+    assert data["schema_version"] == SCHEMA_VERSION
     assert data["task_type"] == "video_generation"
     assert data["start_frame"] is None  # text/reference-to-video, no start frame
     assert data["status"] == "success"

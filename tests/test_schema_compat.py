@@ -21,6 +21,8 @@ ALL_FIXTURES = [
     "v6_generation_success", "v6_editing_failed",
     "v7_image_to_video_success",
     "v8_measured_output_success",
+    "v9_abandoned_failed",
+    "v10_image_generation_success",
 ]
 
 
@@ -29,8 +31,8 @@ def load_fixture(name):
 
 
 def test_current_schema_version_has_a_fixture():
-    assert SCHEMA_VERSION == 8
-    assert (FIXTURES / "v8_measured_output_success.json").is_file()
+    assert SCHEMA_VERSION == 10
+    assert (FIXTURES / "v10_image_generation_success.json").is_file()
 
 
 def test_v1_loads():
@@ -211,8 +213,127 @@ def test_failed_run_with_output_media_rejected():
     assert BenchmarkResult.from_dict(data).status == "failed"
 
 
-def test_current_records_roundtrip(tmp_path):
-    record = load_fixture("v8_measured_output_success")
+@pytest.mark.parametrize("name", ALL_FIXTURES[:11])
+def test_pre_v9_records_are_never_abandoned(name):
+    assert load_fixture(name).failure_stage != "abandoned"
+
+
+def test_v9_abandoned_loads():
+    record = load_fixture("v9_abandoned_failed")
+    assert record.schema_version == 9
+    assert record.status == "failed" and record.failure_stage == "abandoned"
+    assert record.error_type == "AbandonedRun"
+    assert record.output_video is None and record.output_media is None
+    assert record.seed == 42 and record.input_checksums  # what was requested is kept
+    assert record.start_frame["sha256"] and record.start_frame["effective_width"] is None
+
+
+@pytest.mark.parametrize("version", [4, 6, 8])
+def test_abandoned_is_not_a_failure_stage_before_v9(version):
+    data = json.loads((FIXTURES / "v9_abandoned_failed.json").read_text(encoding="utf-8"))
+    data["schema_version"] = version
+    with pytest.raises(ValueError, match="schema_version >= 9"):
+        BenchmarkResult.from_dict(data)
+    data["failure_stage"] = "generation"  # the stages v4-v8 knew are still fine there
+    assert BenchmarkResult.from_dict(data).schema_version == version
+
+
+def test_abandoned_success_rejected():
+    data = json.loads((FIXTURES / "v8_measured_output_success.json").read_text(encoding="utf-8"))
+    data.update(schema_version=9, failure_stage="abandoned")
+    with pytest.raises(ValueError, match="successful run must not have failure fields"):
+        BenchmarkResult.from_dict(data)
+
+
+@pytest.mark.parametrize("name", ALL_FIXTURES[:12])
+def test_pre_v10_records_are_video_records_without_image_output(name):
+    record = load_fixture(name)
+    assert record.image_output is None
+    assert record.task_type in (None, "video_generation", "video_editing")
+
+
+def test_v10_image_generation_loads():
+    record = load_fixture("v10_image_generation_success")
+    assert record.schema_version == 10 and record.task_type == "image_generation"
+    assert record.status == "success"
+    assert record.output_video is None and record.output_media is None
+    assert record.fps is None and record.frame_count is None
+    assert record.resolution == Resolution(width=1536, height=1024)  # requested size of each image
+    (image,) = record.image_output["images"]
+    assert image == {
+        "path": "outputs/character_sheet_hero_01/20261005T030000Z-aaaa0013/image_01.png",
+        "sha256": "5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+        "width": 1536, "height": 1024,
+    }
+    assert record.image_output["seed_used"] is None  # the service had no controllable seed
+    assert record.image_output["provenance"]["response_id"] == "resp_example"
+    assert record.task_parameters["image_count"] == 1
+    assert record.reference_assets == ["benchmarks/references/comic_hero_01/rooftop_frame_v001.png"]
+
+
+def image_record(**changes):
+    data = json.loads((FIXTURES / "v10_image_generation_success.json").read_text(encoding="utf-8"))
+    data.update(changes)
+    return data
+
+
+def test_image_task_types_start_at_v10():
+    with pytest.raises(ValueError, match="schema_version >= 10"):
+        BenchmarkResult.from_dict(image_record(schema_version=9))
+
+
+def test_successful_image_run_needs_image_output_and_has_no_video():
+    with pytest.raises(ValueError, match="must have image_output"):
+        BenchmarkResult.from_dict(image_record(image_output=None))
+    with pytest.raises(ValueError, match="no output_video"):
+        BenchmarkResult.from_dict(image_record(output_video="outputs/x/y/out.mp4"))
+
+
+def test_failed_image_run_has_no_image_output():
+    failed = dict(status="failed", failure_stage="generation", error_type="RuntimeError", error_message="x")
+    with pytest.raises(ValueError, match="only a successful image run"):
+        BenchmarkResult.from_dict(image_record(**failed))
+    record = BenchmarkResult.from_dict(image_record(image_output=None, **failed))
+    assert record.status == "failed" and record.task_type == "image_generation"
+
+
+def test_video_run_must_not_have_image_output():
+    data = json.loads((FIXTURES / "v8_measured_output_success.json").read_text(encoding="utf-8"))
+    data.update(schema_version=10, image_output=image_record()["image_output"])
+    with pytest.raises(ValueError, match="only a successful image run"):
+        BenchmarkResult.from_dict(data)
+
+
+@pytest.mark.parametrize("change, match", [
+    (lambda block: block.pop("provenance"), "keys"),
+    (lambda block: block.update(extra=1), "keys"),
+    (lambda block: block.update(images=[]), "at least one image"),
+    (lambda block: block["images"][0].pop("sha256"), "keys"),
+    (lambda block: block["images"][0].update(sha256=""), "sha256"),
+    (lambda block: block["images"][0].update(path="outputs\\x\\image.png"), "forward slashes"),
+    (lambda block: block["images"][0].update(width=0), "width"),
+    (lambda block: block["images"][0].update(height="1024"), "height"),
+    (lambda block: block.update(seed_used="7"), "seed_used"),
+    (lambda block: block.update(provenance=[]), "provenance"),
+])
+def test_malformed_image_output_rejected(change, match):
+    data = image_record()
+    change(data["image_output"])
+    with pytest.raises(ValueError, match=match):
+        BenchmarkResult.from_dict(data)
+
+
+def test_image_size_may_be_unmeasured():
+    data = image_record()
+    data["image_output"]["images"][0].update(width=None, height=None)
+    assert BenchmarkResult.from_dict(data).image_output["images"][0]["width"] is None
+
+
+@pytest.mark.parametrize("name", [
+    "v8_measured_output_success", "v9_abandoned_failed", "v10_image_generation_success",
+])
+def test_current_records_roundtrip(tmp_path, name):
+    record = load_fixture(name)
     logger = BenchmarkLogger(tmp_path)
     logger.log(record)
     assert logger.load(record.benchmark_id, record.run_id) == record

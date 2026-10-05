@@ -1,0 +1,73 @@
+{
+  "benchmark_id": "comic_rooftop_01",
+  "run_id": "20261005T020000Z-aaaa0012",
+  "model": "legacy-model",
+  "model_version": "1.0",
+  "workflow_version": "wf-1",
+  "seed": 42,
+  "inference_steps": 30,
+  "guidance": 5.0,
+  "prompt": "a cat walking",
+  "negative_prompt": null,
+  "source_video": null,
+  "reference_assets": [],
+  "resolution": {
+    "width": 1280,
+    "height": 704
+  },
+  "fps": null,
+  "frame_count": null,
+  "gpu": null,
+  "vram_gb": null,
+  "generation_time_seconds": null,
+  "estimated_cost_usd": null,
+  "quality_metrics": {},
+  "human_rating": null,
+  "notes": "abandoned: generation started 2026-10-05T02:00:01+00:00 (pid 4242 on workstation) and no record was saved; recorded as failed on 2026-10-05T09:00:00+00:00",
+  "timestamp": "2026-10-05T02:00:00+00:00",
+  "schema_version": 9,
+  "model_parameters": {
+    "sampler": "euler"
+  },
+  "environment": {},
+  "backend": "fake",
+  "backend_version": "1.0",
+  "input_checksums": {
+    "benchmarks/references/comic_hero_01/rooftop_frame_v001.png": "3a3e76750196317ee5142d7d6d00d2c68af58a993ee54ca8cc9fa665dbf1e0fb"
+  },
+  "status": "failed",
+  "failure_stage": "abandoned",
+  "error_type": "AbandonedRun",
+  "error_message": "the run started generating but never finished: no record was saved (process killed, crash or power loss)",
+  "validation_time_seconds": 0.5,
+  "prepare_time_seconds": null,
+  "verification_time_seconds": null,
+  "total_time_seconds": null,
+  "output_video": null,
+  "task_type": "video_generation",
+  "task_parameters": {
+    "duration_seconds": 5,
+    "requested_fps": 24,
+    "duration_tolerance_seconds": 0.1,
+    "camera_motion": "slow cinematic push-in",
+    "subject_motion": [
+      "character sits on the rooftop ledge",
+      "subtle wind in hair and clothing"
+    ],
+    "visual_direction": [
+      "graphic novel aesthetic",
+      "strong ink contours"
+    ]
+  },
+  "start_frame": {
+    "path": "benchmarks/references/comic_hero_01/rooftop_frame_v001.png",
+    "sha256": "3a3e76750196317ee5142d7d6d00d2c68af58a993ee54ca8cc9fa665dbf1e0fb",
+    "original_width": 1672,
+    "original_height": 941,
+    "preprocessing": null,
+    "effective_width": null,
+    "effective_height": null,
+    "derived_file": null
+  },
+  "output_media": null
+}

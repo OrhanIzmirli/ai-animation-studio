@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from ai_studio import cli, paths
+from ai_studio.benchmarking import SCHEMA_VERSION
 from ai_studio.cli import main, parse_param, parse_params, run_benchmark
 from ai_studio.generation.backends import (
     BACKENDS,
@@ -210,7 +211,7 @@ def test_purpose_is_stored_in_task_parameters(cli_project, capsys, extra, expect
     assert f"purpose: {expected}" in capsys.readouterr().out
     record = json.loads((cli_project / "benchmarks/results/cli_01/p.json").read_text(encoding="utf-8"))
     assert record["task_parameters"]["run_purpose"] == expected
-    assert record["schema_version"] == 8  # no schema bump: task_parameters is free-form
+    assert record["schema_version"] == SCHEMA_VERSION  # run_purpose needs no schema change: task_parameters is free-form
 
 
 def test_unknown_purpose_is_a_bad_argument(cli_project, capsys):

@@ -14,6 +14,12 @@ from enum import Enum
 class Capability(str, Enum):
     VIDEO_GENERATION = "video_generation"  # text / image / references -> new video
     VIDEO_EDITING = "video_editing"  # source video / references / instruction -> edited video
+    IMAGE_GENERATION = "image_generation"  # text / references -> new still image(s)
+    IMAGE_EDITING = "image_editing"  # source image / references / instruction -> edited image(s)
+
+
+VIDEO_CAPABILITIES = frozenset({Capability.VIDEO_GENERATION, Capability.VIDEO_EDITING})
+IMAGE_CAPABILITIES = frozenset({Capability.IMAGE_GENERATION, Capability.IMAGE_EDITING})
 
 
 class UnsupportedCapabilityError(ValueError):
