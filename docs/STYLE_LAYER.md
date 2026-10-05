@@ -432,6 +432,10 @@ a time.
 - Lines, palette and timing are driven by luminance and whole-frame motion,
   not by an understanding of the picture: no notion of character vs.
   background, of a face, or of a stroke.
-- Whole-clip in memory: about 330 MB per 121 frames at 1280×704.
+- Whole-clip in memory: about 2.1 GB at peak for 121 frames at 1280×704.
+  The clip itself is 0.33 GB; the peak comes from `motion_of`, which every
+  profile with `timing.mode: animator` calls and which converts the whole
+  clip to float32 at once (about 1.75 GB of temporary arrays, measured with
+  tracemalloc, numpy 1.26.4). A longer clip scales in proportion.
 - Determinism is bit-exact for the same numpy and ffmpeg versions; they are
   recorded in every manifest.
