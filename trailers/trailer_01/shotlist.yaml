@@ -24,14 +24,21 @@ resolution: {width: 1280, height: 704}
 total_duration_seconds: 30
 
 # One artist profile for every shot (configs/style_recipes/<name>.yaml).
-artist_profile: comic_finish_v1
+artist_profile: comic_finish_v3
 
 character: COMIC_HERO_01
 # The look every generated shot shares (appended to the prompts below by hand,
 # so each prompt is complete on its own).
-#   Graphic novel style, hybrid 2D and 3D animation, strong ink contours,
-#   controlled cel shading, halftone print texture, hand-drawn hatching in the
-#   shadows, limited stepped animation timing.
+#   Graphic novel style, hybrid 2D and 3D animation, hand-inked black ink
+#   contours with naturally varying line weight, directional light with real
+#   highlights, core shadows and reflected light, bold flat cel shading,
+#   coarse halftone screen-tone dots in the mid-tones, hand-drawn hatching in
+#   the shadows, faint under-sketch lines in places, a deliberately varied
+#   level of finish, limited stepped animation timing.
+# This is the style of the approved character reference
+# (benchmarks/references/comic_hero_01/character_turnaround_hero_01.jpg; wording
+# from benchmarks/definitions/character_sheet_hero_01.yaml, visual_direction).
+# shot_02 is the exception: its prompt is the frozen benchmark prompt.
 
 shots:
   - id: shot_01
@@ -50,9 +57,13 @@ shots:
       the rooftops: layered towers and water tanks, long orange light, deep
       violet shadows, the first windows and street lights beginning to glow.
       Thin clouds drift slowly. Slow cinematic push-in toward one distant
-      rooftop. Strong ink contours, controlled cel shading, halftone print
-      texture, hand-drawn hatching in the shadows, layered background with
-      depth, limited stepped animation timing. Stable architecture.
+      rooftop. Hand-inked black ink contours with naturally varying line
+      weight, directional sunset light with real highlights, core shadows and
+      reflected light, bold flat cel shading, coarse halftone screen-tone dots
+      in the mid-tones, hand-drawn hatching in the shadows, faint under-sketch
+      lines in places, a deliberately varied level of finish, layered
+      background with depth, limited stepped animation timing. Stable
+      architecture.
     negative_prompt: >-
       photorealistic, live action, 3D render look, glossy plastic shading,
       soft airbrushed gradients, blurry, motion blur smear, flickering lines,
@@ -113,10 +124,14 @@ shots:
       uncovered, lit warm from one side by the last sunset light. The lights of
       the city are reflected as small bright points in his dark eyes. He blinks
       once, slowly; a strand of hair moves in the wind. Calm, watchful
-      expression. Very slight push-in. Strong ink contours, controlled cel
-      shading, halftone print texture, hand-drawn hatching in the shadows,
-      limited stepped animation timing. Consistent character, stable facial
-      structure.
+      expression. Very slight push-in. Hand-inked black ink contours with
+      naturally varying line weight, directional sunset light with real
+      highlights, core shadows and reflected light on his face, bold flat cel
+      shading, coarse halftone screen-tone dots in the mid-tones, hand-drawn
+      hatching in the shadows, faint under-sketch lines in places, a
+      deliberately varied level of finish with the eyes rendered most
+      tightly, limited stepped animation timing. Consistent character, stable
+      facial structure.
     negative_prompt: >-
       photorealistic, live action, 3D render look, glossy plastic shading,
       soft airbrushed gradients, blurry, motion blur smear, flickering lines,
@@ -143,8 +158,12 @@ shots:
       his wrist, the city far below and out of focus in the dusk. His fingers
       tighten. A soft red glow slowly appears under his palm and spreads along
       the fine cracks in the concrete, lighting his fingers from below. Static
-      camera. Strong ink contours, controlled cel shading, halftone print
-      texture, hand-drawn hatching in the shadows, limited stepped animation
+      camera. Hand-inked black ink contours with naturally varying line
+      weight, directional dusk light with real highlights, core shadows and
+      reflected light on the hand, bold flat cel shading, coarse halftone
+      screen-tone dots in the mid-tones, hand-drawn hatching in the shadows,
+      faint under-sketch lines in places, a deliberately varied level of
+      finish with the hand rendered most tightly, limited stepped animation
       timing. Consistent clothing design.
     negative_prompt: >-
       photorealistic, live action, 3D render look, glossy plastic shading,
@@ -172,9 +191,12 @@ shots:
       lights go out block by block, a wave of darkness moving from the horizon
       toward the camera, until the nearest block goes dark too and only the
       moonlight outlines the buildings. Static camera with a very slow drift.
-      Strong ink contours, controlled cel shading, halftone print texture,
-      hand-drawn hatching in the shadows, layered background with depth,
-      limited stepped animation timing. Stable architecture.
+      Hand-inked black ink contours with naturally varying line weight,
+      directional moonlight with real highlights, core shadows and reflected
+      light, bold flat cel shading, coarse halftone screen-tone dots in the
+      mid-tones, hand-drawn hatching in the shadows, faint under-sketch lines
+      in places, a deliberately varied level of finish, layered background
+      with depth, limited stepped animation timing. Stable architecture.
     negative_prompt: >-
       photorealistic, live action, 3D render look, glossy plastic shading,
       soft airbrushed gradients, blurry, motion blur smear, flickering lines,
@@ -201,10 +223,14 @@ shots:
       rises to his feet on a rooftop ledge above a darkened city. He pulls the
       hood of his jacket up over his hair with one hand and stands still, a
       dark silhouette against a large full moon, wind moving his jacket.
-      Static camera. Strong ink contours, controlled cel shading, halftone
-      print texture, hand-drawn hatching in the shadows, limited stepped
-      animation timing. Consistent character, consistent clothing design,
-      stable architecture.
+      Static camera. Hand-inked black ink contours with naturally varying
+      line weight, directional moonlight from behind with real highlights,
+      core shadows and reflected light, bold flat cel shading, coarse halftone
+      screen-tone dots in the mid-tones, hand-drawn hatching in the shadows,
+      faint under-sketch lines in places, a deliberately varied level of
+      finish with his figure rendered most tightly, limited stepped animation
+      timing. Consistent character, consistent clothing design, stable
+      architecture.
     negative_prompt: >-
       photorealistic, live action, 3D render look, glossy plastic shading,
       soft airbrushed gradients, blurry, motion blur smear, flickering lines,

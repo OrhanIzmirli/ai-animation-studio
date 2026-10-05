@@ -16,6 +16,11 @@ KEYFRAMES = PROMPTS / "trailer_01_keyframes.md"
 # Nothing a prompt ASKS for may contain these (checklists may name them as things to reject).
 BANNED = ("spider", "web", "mask", "letter", "emblem", "logo", "superhero", "costume", "cape", "armor", "weapon")
 STYLE_TERMS = ("graphic novel", "ink contours", "cel shading", "halftone", "hatching")
+# The style of the approved turnaround sheet (character_sheet_hero_01.yaml, visual_direction).
+APPROVED_STYLE_TERMS = (
+    "line weight", "highlight", "core shadows", "reflected light", "halftone screen-tone dots in the mid-tones",
+    "under-sketch", "level of finish",
+)
 OUTFIT_TERMS = (
     "short curly dark hair", "black hooded jacket", "dark-red accents", "black backpack", "dark-red straps",
     "cargo trousers", "white low-top sneakers",
@@ -135,15 +140,33 @@ def test_keyframe_prompts_refer_to_the_accepted_character_sheet_and_the_style():
     shots = sections(KEYFRAMES, "Shot")
     for shot_id in ("shot_03", "shot_04", "shot_06"):
         start = prompt_blocks(shots[shot_id])[0]
-        assert "attached character sheet view" in start, shot_id
+        assert "attached character sheet" in start and "use only the three figures" in start, shot_id
         assert "rooftop" in start and "16:9" in start, shot_id
-        for term in STYLE_TERMS:
+        for term in STYLE_TERMS + APPROVED_STYLE_TERMS:
             assert term in start, (shot_id, term)
-        assert re.search(r"Attach: .*`(front|back)\.png`", shots[shot_id]), shot_id
+        assert "few flat tones" not in start and "same style as the rooftop" not in start, shot_id
+        # the approved turnaround sheet and the canonical frame, not the per-view images of the old plan
+        assert re.search(
+            r"Attach: `benchmarks/references/comic_hero_01/character_turnaround_hero_01\.jpg`.*"
+            r"`benchmarks/references/comic_hero_01/rooftop_frame_v001\.png`", shots[shot_id],
+        ), shot_id
+        assert not re.search(r"`(front|back|three_quarter_left|three_quarter_right)\.png`", shots[shot_id]), shot_id
     for shot_id in ("shot_04", "shot_06"):
         end = prompt_blocks(shots[shot_id])[1]
         assert "exact starting point" in end and "Change only this" in end, shot_id
         assert "16:9" in end
+        for term in APPROVED_STYLE_TERMS:
+            assert term in end, (shot_id, term)
+
+
+def test_shot_list_uses_the_approved_style_and_the_latest_profile(shotlist):
+    assert shotlist.artist_profile == "comic_finish_v3"
+    for shot in shotlist.shots:
+        if shot.source != "generated" or shot.id == "shot_02":  # shot_02 keeps the frozen benchmark prompt
+            continue
+        for term in APPROVED_STYLE_TERMS:
+            assert term in shot.prompt, (shot.id, term)
+        assert "controlled cel shading" not in shot.prompt, shot.id
 
 
 def test_keyframes_show_the_start_of_each_shot(shotlist):
