@@ -24,10 +24,14 @@ Only features visible in the canonical frame are part of the design.
 | File | Content | Dimensions | SHA-256 |
 |---|---|---|---|
 | `rooftop_frame_v001.png` | canonical `start_frame` (frame 0) of `comic_rooftop_01` | 1672×941, RGB 8-bit PNG, 2,497,820 bytes | `3a3e76750196317ee5142d7d6d00d2c68af58a993ee54ca8cc9fa665dbf1e0fb` |
+| `character_turnaround_hero_01.jpg` | canonical character reference: one turnaround sheet, three views (front, three-quarter, back); hand-made, imported 2026-10-05, provenance in `character_turnaround_hero_01.jpg.provenance.json` | 1024×765, JPEG, 141,207 bytes | `7a7b391bc05a948e57b52b6173a03ef912f890875b0865c07e90dacf47d09c8a` |
 
 Verify a copy with: `python -c "from ai_studio.benchmarking.runner import sha256_file; print(sha256_file('benchmarks/references/comic_hero_01/rooftop_frame_v001.png'))"`
 
 ## Other files (planned, not yet used by any benchmark)
+
+The separate front / three-quarter / profile views below were planned before
+the turnaround sheet above was made; the sheet takes their place.
 
 | File | Content |
 |---|---|

@@ -86,11 +86,31 @@ A sheet with a missing or extra view should say so in `notes`; it lowers
 `identity_consistency` and `anatomy` only as far as the remaining views
 deserve. Whether a missing view should fail a run outright is an open point.
 
+## Canonical character reference (hand-made, approved 2026-10-05)
+
+`benchmarks/references/comic_hero_01/character_turnaround_hero_01.jpg`
+(1024x765 JPEG, SHA-256
+`7a7b391bc05a948e57b52b6173a03ef912f890875b0865c07e90dacf47d09c8a`), made by
+hand in the Gemini app and imported with `scripts/import_reference.py`. Its
+provenance file lies beside it; the prompt chain is
+[`docs/prompts/character_turnaround_hero_01.prompt.txt`](prompts/character_turnaround_hero_01.prompt.txt).
+
+It is **one sheet image**, as this benchmark assumes, with **three views**
+(front, three-quarter, back), not the five listed above. It is the canonical
+reference for who `COMIC_HERO_01` is, including his face. It is not an input
+of this benchmark: `reference_images` still holds only the canonical frame.
+
 ## Open points (why this is a draft)
 
-1. The face is invented by the first accepted sheet.
+1. Decided: the face is the one on the approved turnaround sheet.
 2. The red marks on the jacket back in the canonical frame are read here as
    plain accents, not as a symbol. If they are meant as a design element, the
    outfit list must say exactly what they are.
-3. One sheet image (this draft) or one image per view.
+3. Decided: one sheet image, not one image per view.
 4. Which image backend, and at what size.
+5. This draft asks for five views; the approved reference has three. Either
+   the benchmark follows the reference (three views) or stays at five.
+6. The style constraints above ask for flat, even lighting and clean, closed
+   line work; the prompts that produced the approved reference ask for
+   directional and rim lighting and visible under-sketch lines. Which of the
+   two the benchmark should rate against is not decided.

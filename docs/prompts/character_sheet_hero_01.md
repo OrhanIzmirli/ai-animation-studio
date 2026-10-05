@@ -1,5 +1,18 @@
 # Prompt pack: character sheet for COMIC_HERO_01 (manual, Gemini app)
 
+> **SUPERSEDED (2026-10-05). The five per-view prompts below were not what
+> was used.** The approved character reference for `COMIC_HERO_01` is a
+> single three-view turnaround sheet (front, three-quarter, back):
+>
+> - prompt chain that actually produced it (five turns in one Gemini
+>   conversation): [`character_turnaround_hero_01.prompt.txt`](character_turnaround_hero_01.prompt.txt)
+> - resulting asset: `benchmarks/references/comic_hero_01/character_turnaround_hero_01.jpg`
+>   (provenance and SHA-256 in `character_turnaround_hero_01.jpg.provenance.json` beside it)
+>
+> Only turn 1 of that chain is the front-view prompt from this pack. The rest
+> of this file is kept for reference; do not follow it to rebuild the
+> reference.
+
 For making the views required by
 [`benchmarks/definitions/character_sheet_hero_01.yaml`](../../benchmarks/definitions/character_sheet_hero_01.yaml)
 by hand in the Gemini app, **one view per image**, from the canonical frame
@@ -14,9 +27,9 @@ character, title or costume.
 
 Note: the benchmark draft describes ONE sheet image with five views. This pack
 makes five single images instead, because that is what you asked for and what
-works by hand. Which of the two the benchmark should fix is still open.
+works by hand. (Decided since: one sheet image, see the note at the top.)
 
-## Before you start
+## Before you start (superseded, kept for reference)
 
 1. Use one fresh chat for the whole sheet. Pick the image model in the app
    and write down its name exactly as the app shows it (you need it for the
@@ -194,7 +207,7 @@ Picture
 When all five views are accepted, compare them side by side once more for
 the identity and outfit lines, then import them.
 
-## Importing an accepted image
+## Importing an accepted image (superseded example)
 
 One command per accepted image; it copies the file unchanged and records
 where it came from:

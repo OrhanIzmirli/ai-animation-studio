@@ -11,6 +11,13 @@
 # DRAFT. Not runnable until a human sets "status: ready". Open points are
 # listed under "notes" and in the specification.
 #
+# Canonical character reference for COMIC_HERO_01 (hand-made, approved
+# 2026-10-05): ONE sheet image, as this benchmark assumes, with THREE views
+# (front, three-quarter, back) where this draft asks for five.
+#   benchmarks/references/comic_hero_01/character_turnaround_hero_01.jpg
+#   1024x765 JPEG, sha256 7a7b391bc05a948e57b52b6173a03ef912f890875b0865c07e90dacf47d09c8a
+# It is recorded under "notes"; it is not an input of this benchmark.
+#
 # Paths are relative to the project root.
 # Original character. No existing character, title, logo, costume or
 # signature motif of any franchise.
@@ -95,6 +102,10 @@ notes: |
   reference_sha256: 3a3e76750196317ee5142d7d6d00d2c68af58a993ee54ca8cc9fa665dbf1e0fb
   evaluation: CharacterSheetEvaluation (manual, 1-10, higher is better)
   suggested size: a wide sheet, e.g. 1536x1024 or wider (chosen per run, recorded)
-  open (draft): the face is invented by the first accepted sheet - a human must approve it
+  canonical_character_reference: benchmarks/references/comic_hero_01/character_turnaround_hero_01.jpg
+  canonical_character_reference_sha256: 7a7b391bc05a948e57b52b6173a03ef912f890875b0865c07e90dacf47d09c8a
+  canonical_character_reference_views: front, three-quarter, back (one sheet image, hand-made, approved 2026-10-05)
+  decided: one sheet image, not one image per view
+  decided: the face is the one on the approved turnaround sheet
   open (draft): the red marks on the jacket back in the canonical frame are read here as plain accents, not a symbol
-  open (draft): one sheet image vs. one image per view
+  open (draft): this draft asks for five views, the approved reference has three
