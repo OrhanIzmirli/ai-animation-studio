@@ -251,6 +251,48 @@ asked pose, without invented accessories, in about 35 to 65 s per image on
 this laptop. What it does not deliver: a pure black jacket, reliably dark
 trousers, or one fixed face. It was tested on one prompt and one pose only.
 
+## The locked pipeline on real project scenes (2026-10-06)
+
+600-step LoRA at 1.0, IP-Adapter 0.4 "ease out", same reference crop, seed
+42, 1280x704. Prompts are short versions of the scene texts in
+`docs/prompts/trailer_01_keyframes.md` with `hero01` in front. One image
+each, judged by eye.
+
+| Image | Scene | What came out | Usable in the real scene? |
+|---|---|---|---|
+| `..._pipe_shot04_start.png` | shot_04 start: hand on the ledge, dusk, no glow | Hand resting on a concrete ledge, city below, no glow, no watch. Sleeve blue-grey, not black; no dark-red cuff; pale daylight instead of blue-violet dusk; four fingers visible | **No, not as it is.** The framing is right; colour of the sleeve and the light are wrong |
+| `..._pipe_shot04_end_d35.png` | shot_04 end: image-to-image from the start, denoise 0.35, prompt asks for the grip and the red glow | The same frame, line for line. **No glow, no change in the fingers** | **No.** Nothing of the asked change happened |
+| `..._pipe_shot04_end_d50.png` | same, denoise 0.50 | Same frame again, still no glow; lines and colours oversharpened | **No** |
+| `..._pipe_shot03_eyes.png` | shot_03: extreme close-up of the eyes, sunset from one side | A close-up of two eyes, but hazel irises with blue around them, no curls, no warm / violet split, smoother line work | **No.** Not recognisably this character; the hand-made keyframe is far better |
+| `..._pipe_shot06_start.png` | shot_06 start: from behind on the ledge, rising, night, full moon | From behind: curly dark hair, dark jacket, black backpack with dark-red piping, red hood lining. Sitting crouched, not rising; daytime city, no moon; dark sneakers | **Partly.** The character from behind is recognisable; time of day, moon and pose are not followed |
+
+By the earlier criteria: no wristwatch and no logo in any of them; the
+jacket (where visible) is blue-grey in shot_04 and near black in shot_06; the
+face only appears in shot_03, where it is not the reference face.
+
+What this adds to the picture:
+
+- **"Keep the same frame" is half solved.** Image-to-image at 0.35 to 0.50
+  does keep the frame exactly, but at that strength it cannot add something
+  new: the red glow never appears. The start / end pair of shot_04 is
+  therefore **not** produced. Not tried, and needing no download: redrawing
+  only the palm and the cracks through a mask at high denoise (inpainting).
+- The pipeline holds the character when the prompt is a figure in view (the
+  bench, shot_06 from behind). On a detail shot (a hand, two eyes) the LoRA
+  and the upper-body reference have little to hold on to, and the result is
+  generic.
+- Scene lighting from the prompt (dusk, night, moon, sunset from one side)
+  was not followed in any of the four scenes.
+
+### Weighted prompt for the jacket (separate try)
+
+`..._pipe_bench_weighted_black.png`: the bench prompt, seed 42, with
+"(solid black jacket:1.3), (pure black:1.2)" added. Against
+`..._lora600_ipa04.png` (same seed, no weights) the jacket is a little
+darker, still dark charcoal with grey panels, not pure black; trousers stay
+olive; pose, face, no watch and no logo are unchanged. The weighting helps
+slightly and does not solve it.
+
 ## Open, for a decision
 
 - Composition locking (the shot_04 start / end problem) is not shown to work.

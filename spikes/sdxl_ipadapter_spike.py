@@ -82,7 +82,7 @@ def clean_reference() -> "Image.Image":
 def workflow(
     image_name: str, weight: float, positive: str = POSITIVE, negative: str = NEGATIVE, seed: int = SEED,
     control: dict | None = None, init_image: str | None = None, denoise: float = 1.0,
-    lora: str | None = None, lora_strength: float = 1.0,
+    lora: str | None = None, lora_strength: float = 1.0, size: tuple[int, int] = (WIDTH, HEIGHT),
 ) -> dict:
     """control: {"image": uploaded name, "strength", "end", "canny": (low, high)} or None.
     init_image: uploaded name of the picture to start from (image-to-image), with `denoise` < 1."""
@@ -90,7 +90,7 @@ def workflow(
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": CHECKPOINT}},
         "2": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": positive}},
         "3": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": negative}},
-        "4": {"class_type": "EmptyLatentImage", "inputs": {"width": WIDTH, "height": HEIGHT, "batch_size": 1}},
+        "4": {"class_type": "EmptyLatentImage", "inputs": {"width": size[0], "height": size[1], "batch_size": 1}},
         "5": {"class_type": "LoadImage", "inputs": {"image": image_name}},
         "6": {"class_type": "IPAdapterModelLoader", "inputs": {"ipadapter_file": IPADAPTER}},
         "7": {"class_type": "CLIPVisionLoader", "inputs": {"clip_name": CLIP_VISION}},
@@ -196,6 +196,7 @@ def main() -> int:
     parser.add_argument("--canny", type=float, nargs=2, default=[0.4, 0.8], metavar=("LOW", "HIGH"))
     parser.add_argument("--lora", default=None, help="LoRA file name in <ComfyUI>/models/loras")
     parser.add_argument("--lora-strength", type=float, default=1.0)
+    parser.add_argument("--size", type=int, nargs=2, default=[WIDTH, HEIGHT], metavar=("W", "H"))
     parser.add_argument("--positive", default=None, help="replace the whole positive prompt")
     parser.add_argument("--init-image", default=None, help="start from this picture (image-to-image)")
     parser.add_argument("--denoise", type=float, default=1.0, help="with --init-image: how much of it is redrawn (0-1)")
@@ -217,7 +218,7 @@ def main() -> int:
     report: dict = {
         "checkpoint": CHECKPOINT, "ipadapter": IPADAPTER, "clip_vision": CLIP_VISION,
         "weight_type": WEIGHT_TYPE, "images": [],
-        "width": WIDTH, "height": HEIGHT, "steps": STEPS, "cfg": CFG, "seed": args.seed,
+        "width": args.size[0], "height": args.size[1], "steps": STEPS, "cfg": CFG, "seed": args.seed,
         "positive": positive, "negative": negative, "reference": str(REFERENCE.relative_to(ROOT)),
         "init_image": args.init_image, "denoise": args.denoise if args.init_image else 1.0,
         "lora": args.lora, "lora_strength": args.lora_strength if args.lora else None,
@@ -260,7 +261,7 @@ def main() -> int:
             started = time.perf_counter()
             prompt_id = client.queue_prompt(workflow(
                 image_name, weight, positive, negative, args.seed, control, init_name, args.denoise,
-                args.lora, args.lora_strength,
+                args.lora, args.lora_strength, tuple(args.size),
             ))
             outputs = client.wait_for_prompt(prompt_id, timeout_seconds=1800)
             seconds = round(time.perf_counter() - started, 1)  # the first image includes loading the models
