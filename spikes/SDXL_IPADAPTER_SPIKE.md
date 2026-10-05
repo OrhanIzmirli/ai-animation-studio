@@ -205,6 +205,52 @@ to the reference). The 600-step LoRA with 0.4 is second (olive trousers, face
 in profile). This rests on one seed per setting; a few seeds per setting are
 needed before calling either one the pipeline.
 
+### Seeds: 400 steps against 600 steps (2026-10-06)
+
+Both with IP-Adapter 0.4 "ease out", LoRA strength 1.0, same prompt and
+negative prompt, seeds 42 to 45. Files `..._lora<N>_ipa04.png` (seed 42) and
+`..._lora<N>_ipa04_seed<S>.png`. Judged by eye, one look per image.
+
+| LoRA | Seed | Jacket colour | Watch | Logo | Pose / framing | Outfit kept | Face against the reference |
+|---|---|---|---|---|---|---|---|
+| 400 | 42 | dark charcoal | no | no | bench, three-quarter, face to the viewer | zipped hoodie, red straps | close |
+| 400 | 43 | near black | no | no | bench, three-quarter, full body | **no**: jacket open over a grey T-shirt, red hood lining, no backpack | similar, leaner and older |
+| 400 | 44 | dark brown | no | no | bench, three-quarter | zipped, one red strap; trousers brown | similar |
+| 400 | 45 | dark brown-black | no | no | **frontal**, full bench | zipped hoodie, red straps; trousers brown | close |
+| 600 | 42 | dark charcoal | no | no | bench, three-quarter, head almost in profile | zipped hoodie, red straps; trousers olive | similar |
+| 600 | 43 | dark charcoal-brown | no | no | bench, three-quarter, full body | zipped hoodie, backpack straps, red hood lining | close |
+| 600 | 44 | dark charcoal-brown | no | no | bench, three-quarter | zipped hoodie, red straps; trousers brown | similar |
+| 600 | 45 | charcoal | no | no | bench, three-quarter, closer framing | zipped hoodie, red straps, an added red line across the chest; trousers olive-grey | similar, nose larger |
+
+- **600 steps is the more consistent one.** It gives the asked three-quarter
+  view and the zipped hooded jacket with backpack straps in four of four
+  seeds. 400 steps does so in two of four: one seed drops the backpack and
+  opens the jacket, another turns the figure frontal.
+- No watch and no chest logo in any of the eight. The logo seen earlier at
+  500 and 600 steps with IP-Adapter 0.5 / 0.6 did not come back at 0.4.
+- Not solved by either: the jacket is dark charcoal to dark brown, never pure
+  black; the trousers come out brown or olive in five of eight; the face is
+  the same type in all eight but not one identical face.
+- 53 to 66 s per image this time (less RAM was free at the start, 7.4 GB);
+  peak VRAM 6.8 to 6.9 GB; no failure.
+
+## Pipeline proposal (as far as this spike supports it)
+
+| Setting | Value |
+|---|---|
+| Base model | `sd_xl_base_1.0.safetensors` |
+| Character LoRA | `ai_studio_hero01_r8_600_steps_00501_.safetensors` (rank 8, 600 steps), strength 1.0, trigger word `hero01` at the start of the prompt |
+| IP-Adapter | `ip-adapter-plus_sdxl_vit-h`, weight **0.4**, weight_type **"ease out"** ("prompt is more important"), reference = the text-free front upper-body crop of the turnaround sheet |
+| Sampler | 1024x1024, 25 steps, CFG 6, dpmpp_2m / karras |
+| Negative prompt | the base list plus "no watch, no wristwatch" |
+| Same frame, small change (e.g. shot_04 start / end) | image-to-image from the accepted frame at denoise about 0.35 |
+| Not used | Lineart T2I-Adapter (breaks the picture as set up), IP-Adapter-FaceID (licence) |
+
+What it delivers: a recognisably consistent character across seeds, in the
+asked pose, without invented accessories, in about 35 to 65 s per image on
+this laptop. What it does not deliver: a pure black jacket, reliably dark
+trousers, or one fixed face. It was tested on one prompt and one pose only.
+
 ## Open, for a decision
 
 - Composition locking (the shot_04 start / end problem) is not shown to work.
