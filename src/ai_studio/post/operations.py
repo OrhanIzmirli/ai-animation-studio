@@ -61,15 +61,23 @@ def _to_uint8(image: np.ndarray) -> np.ndarray:
 
 # --- palette ---
 
-def learn_palette(source_image: np.ndarray, k: int, seed: int = 0, iterations: int = 25) -> np.ndarray:
-    """A k-colour palette (k, 3) float32 learned from one image by k-means
-    with a fixed seed, sorted from dark to light. Imitates: a production's
-    fixed set of paints / inks, chosen once for a shot."""
-    if not isinstance(k, int) or isinstance(k, bool) or k < 2:
-        raise ValueError("k must be an int >= 2")
-    pixels = np.asarray(source_image).reshape(-1, 3).astype(np.float32)
-    step = max(1, len(pixels) // 40000)
-    sample = pixels[::step]
+ACCENT_HUE_BINS = 24
+ACCENT_MIN_SHARE = 0.0002  # a hue must cover at least this share of the image to count as an accent
+
+
+def saturation_value_hue(pixels: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """HSV saturation (0-1), value (0-1) and hue (0-1) of (..., 3) RGB pixels."""
+    rgb = np.asarray(pixels, dtype=np.float32)
+    high, low = rgb.max(axis=-1), rgb.min(axis=-1)
+    chroma = high - low
+    saturation = np.where(high > 0, chroma / np.maximum(high, 1e-6), 0.0)
+    safe = np.maximum(chroma, 1e-6)
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    hue = np.where(high == r, ((g - b) / safe) % 6.0, np.where(high == g, (b - r) / safe + 2.0, (r - g) / safe + 4.0))
+    return saturation, high / 255.0, np.where(chroma > 0, hue / 6.0, 0.0)
+
+
+def _kmeans(sample: np.ndarray, k: int, seed: int, iterations: int) -> np.ndarray:
     rng = rng_for(seed, SALT_PALETTE)
     centres = sample[rng.choice(len(sample), size=min(k, len(sample)), replace=False)].copy()
     for _ in range(iterations):
@@ -78,7 +86,84 @@ def learn_palette(source_image: np.ndarray, k: int, seed: int = 0, iterations: i
             members = sample[nearest == index]
             if len(members):
                 centres[index] = members.mean(axis=0)
-    return centres[np.argsort(centres @ np.array([0.299, 0.587, 0.114], dtype=np.float32), kind="stable")]
+    return centres
+
+
+def accent_colours(
+    source_image: np.ndarray, base: np.ndarray, slots: int, saturation: float = 0.55, value: float = 0.35,
+) -> np.ndarray:
+    """Up to `slots` saturated colours of the image that the palette `base`
+    represents worst: (n, 3) float32, n <= slots.
+
+    Pixels with HSV saturation >= `saturation` and value >= `value` are
+    grouped by hue (ACCENT_HUE_BINS bins). Each hue that covers at least
+    ACCENT_MIN_SHARE of the image offers its mean colour as a candidate. The
+    candidates farthest from every colour already in the palette are taken
+    first, so slots go to small accents that plain k-means would merge into a
+    neighbouring colour, not to large saturated areas it already covers."""
+    pixels = np.asarray(source_image).reshape(-1, 3).astype(np.float32)
+    sat, val, hue = saturation_value_hue(pixels)
+    vivid = (sat >= saturation) & (val >= value)
+    bins = np.minimum((hue * ACCENT_HUE_BINS).astype(int), ACCENT_HUE_BINS - 1)
+    minimum = max(16, int(ACCENT_MIN_SHARE * len(pixels)))
+    candidates = [
+        pixels[vivid & (bins == index)].mean(axis=0)
+        for index in range(ACCENT_HUE_BINS) if int((vivid & (bins == index)).sum()) >= minimum
+    ]
+    palette, chosen = [colour for colour in base], []
+    while candidates and len(chosen) < slots:
+        distances = [min(float(((c - p) ** 2).sum()) for p in palette) for c in candidates]
+        best = int(np.argmax(distances))
+        if distances[best] == 0.0:
+            break
+        colour = candidates.pop(best)
+        chosen.append(colour)
+        palette.append(colour)
+    return np.array(chosen, dtype=np.float32).reshape(-1, 3)
+
+
+def learn_palette(
+    source_image: np.ndarray, k: int, seed: int = 0, iterations: int = 25,
+    accent_slots: int = 0, accent_saturation: float = 0.55, accent_value: float = 0.35,
+) -> np.ndarray:
+    """The palette of learn_palette_with_accents, without the accent flags."""
+    return learn_palette_with_accents(
+        source_image, k, seed, iterations, accent_slots, accent_saturation, accent_value,
+    )[0]
+
+
+def learn_palette_with_accents(
+    source_image: np.ndarray, k: int, seed: int = 0, iterations: int = 25,
+    accent_slots: int = 0, accent_saturation: float = 0.55, accent_value: float = 0.35,
+) -> tuple[np.ndarray, np.ndarray]:
+    """A palette of at most k colours, (k, 3) float32, learned from one image
+    and sorted from dark to light, plus a bool array marking which of its
+    colours are reserved accents. Imitates: a production's fixed set of
+    paints / inks, chosen once for a shot.
+
+    accent_slots = 0: plain k-means with a fixed seed. Small areas lose
+    their colour, because k-means spends its colours where the pixels are.
+
+    accent_slots = n: n of the k colours are reserved for saturated accents
+    of the image (see accent_colours); the other k - n come from k-means. A
+    painter keeps a pot of the accent colour even if it is used in one spot."""
+    if not isinstance(k, int) or isinstance(k, bool) or k < 2:
+        raise ValueError("k must be an int >= 2")
+    if not isinstance(accent_slots, int) or isinstance(accent_slots, bool) or not 0 <= accent_slots < k:
+        raise ValueError("accent_slots must be an int with 0 <= accent_slots < k")
+    pixels = np.asarray(source_image).reshape(-1, 3).astype(np.float32)
+    step = max(1, len(pixels) // 40000)
+    sample = pixels[::step]
+    centres = _kmeans(sample, k - accent_slots, seed, iterations)
+    flags = np.zeros(len(centres), dtype=bool)
+    if accent_slots:
+        accents = accent_colours(source_image, centres, accent_slots, accent_saturation, accent_value)
+        if len(accents) < accent_slots:  # fewer accents than slots: give the slots back to k-means
+            centres = _kmeans(sample, k - len(accents), seed, iterations)
+        flags = np.r_[np.zeros(len(centres), dtype=bool), np.ones(len(accents), dtype=bool)]
+        centres = np.concatenate([centres, accents]) if len(accents) else centres
+    order = np.argsort(centres @ np.array([0.299, 0.587, 0.114], dtype=np.float32), kind="stable")
+    return centres[order], flags[order]
 
 
 def _nearest(pixels: np.ndarray, palette: np.ndarray) -> np.ndarray:
@@ -88,12 +173,20 @@ def _nearest(pixels: np.ndarray, palette: np.ndarray) -> np.ndarray:
 
 def palette_limit(
     frames: np.ndarray, k: int, source_image: np.ndarray, seed: int = 0, strength: float = 1.0,
+    accent_slots: int = 0, accent_saturation: float = 0.55, accent_value: float = 0.35,
+    accent_pixel_saturation: float = 0.0,
 ) -> np.ndarray:
     """Limit every drawing to ONE k-colour palette learned from `source_image`
     (the shot's start frame).
 
     strength 1.0 replaces each pixel by its nearest palette colour; lower
     values blend toward the original (a softer, less posterised look).
+    accent_slots reserves that many of the k colours for small saturated
+    accents of the start frame (see learn_palette); 0 = plain k-means.
+    accent_pixel_saturation: only pixels at least this saturated (HSV, 0-1)
+    may take a reserved accent colour; duller pixels choose among the other
+    colours. 0 = any pixel may. Without it a pale neutral (a white shoe) can
+    be nearest to a pale accent and take on its hue.
 
     Imitates: painting with a limited, fixed set of colours, so that colour
     cannot drift from frame to frame. Limits: smooth gradients become bands;
@@ -102,11 +195,21 @@ def palette_limit(
     frames = _check(frames)
     if not 0.0 <= strength <= 1.0:
         raise ValueError("strength must be in [0, 1]")
-    palette = learn_palette(source_image, k, seed)
+    if not 0.0 <= accent_pixel_saturation <= 1.0:
+        raise ValueError("accent_pixel_saturation must be in [0, 1]")
+    palette, is_accent = learn_palette_with_accents(
+        source_image, k, seed, accent_slots=accent_slots, accent_saturation=accent_saturation,
+        accent_value=accent_value,
+    )
+    guard = accent_pixel_saturation > 0 and is_accent.any() and not is_accent.all()
+    base = palette[~is_accent]
     out = np.empty_like(frames)
     for index, frame in enumerate(frames):
         pixels = frame.reshape(-1, 3).astype(np.float32)
         quantized = palette[_nearest(pixels, palette)]
+        if guard:
+            dull = saturation_value_hue(pixels)[0] < accent_pixel_saturation
+            quantized[dull] = base[_nearest(pixels[dull], base)]
         out[index] = _to_uint8(quantized * strength + pixels * (1.0 - strength)).reshape(frame.shape)
     return out
 
@@ -215,6 +318,7 @@ def ink_lines(
     pressure_variation: float = 0.25,
     boil_px: float = 0.0,
     noise_scale: float = 96.0,
+    preserve_luminance: bool = False,
     seed: int = 0,
     ids: Sequence[int] | None = None,
 ) -> np.ndarray:
@@ -224,6 +328,12 @@ def ink_lines(
     thickness  line weight in pixels: (min, max), or one number for both.
                Within that range the weight follows the picture; see ink_mask.
     boil_px    line wobble between drawings, OFF (0) by default; see line_boil.
+    preserve_luminance
+               True: after inking, the whole drawing is brightened by one
+               gain so that its mean luminance is what it was before. Ink
+               then adds contours without making the picture darker (a
+               painter mixes the fills a little lighter because the ink will
+               sit on top). False: ink only darkens.
 
     Imitates: inking by hand, where the line is heavier on the shadow side
     and at strong edges, lighter in the light, and tapers at its ends.
@@ -243,8 +353,22 @@ def ink_lines(
             pressure_variation=pressure_variation, noise_scale=noise_scale, seed=seed, drawing_id=drawing_id,
         )
         mask = line_boil(mask, boil_px, seed, drawing_id, noise_scale)
-        out[index] = _to_uint8(frame.astype(np.float32) * (1.0 - strength * mask)[..., None])
+        inked = frame.astype(np.float32) * (1.0 - strength * mask)[..., None]
+        if preserve_luminance:
+            inked = _restore_mean_luminance(inked, float(luma(frame).mean()))
+        out[index] = _to_uint8(inked)
     return out
+
+
+def _restore_mean_luminance(image: np.ndarray, target: float) -> np.ndarray:
+    """Scale a float image by one gain so that its mean luma is `target`.
+    A few passes, because clipping at white takes a little back each time."""
+    for _ in range(4):
+        current = float(luma(np.clip(image, 0.0, 255.0)).mean())
+        if current <= 0.0:
+            break
+        image = image * (target / current)
+    return image
 
 
 # --- halftone ---
@@ -256,6 +380,7 @@ def halftone(
     *,
     strength: float = 0.5,
     variation: float = 0.15,
+    preserve_tone: bool = False,
     seed: int = 0,
 ) -> np.ndarray:
     """Dot screen in the shadows only.
@@ -266,6 +391,11 @@ def halftone(
     strength   how much a dot darkens the picture
     variation  slow variation of the dot size across the picture (ink gain of
                the "plate"); one field for the whole clip, fixed to the screen
+    preserve_tone
+               True: the paper between the dots is lightened by exactly what
+               the dots take away, so each area keeps its average tone, as a
+               real halftone screen does (it renders a tone as dark dots on
+               lighter ground). False: dots only darken.
 
     Imitates: halftone printing of comics, where shadows are built from dots.
     The screen itself is regular because a printing screen is; it does not
@@ -286,7 +416,17 @@ def halftone(
         darkness = np.clip((threshold - luma(frame)) / threshold, 0.0, 1.0)
         radius = 0.6 * np.sqrt(darkness) * gain
         dots = np.clip((radius - distance) * dot_size + 0.5, 0.0, 1.0) * (darkness > 0)
-        out[index] = _to_uint8(frame.astype(np.float32) * (1.0 - strength * dots)[..., None])
+        factor = 1.0 - strength * dots
+        if preserve_tone:
+            # What the dots take away from the shadow around each point
+            # (measured over about one screen cell, counting shadow pixels
+            # only) is given back to the shadow between the dots. Pixels
+            # outside the shadow are not touched.
+            shadow = (darkness > 0).astype(np.float32)
+            radius_px = int(np.ceil(dot_size))
+            taken = box_blur(strength * dots, radius_px) / np.maximum(box_blur(shadow, radius_px), 1e-3)
+            factor = np.where(shadow > 0, factor / np.maximum(1.0 - taken, 0.05), 1.0)
+        out[index] = _to_uint8(frame.astype(np.float32) * factor[..., None])
     return out
 
 

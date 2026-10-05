@@ -448,7 +448,8 @@ PROFILE = {
 
 def test_repository_profiles_load_and_are_named_by_technique():
     names = sorted(path.stem for path in RECIPES.glob("*.yaml"))
-    assert names == ["comic_finish_v1", "retro_cel_v1"]
+    assert {"comic_finish_v1", "retro_cel_v1"} <= set(names)
+    assert all(name.rsplit("_v", 1)[0] in ("comic_finish", "retro_cel") for name in names)  # techniques only
     comic, retro = load_profile(RECIPES / "comic_finish_v1.yaml"), load_profile(RECIPES / "retro_cel_v1.yaml")
     assert comic.profile_id == "comic_finish_v1" and retro.profile_id == "retro_cel_v1"
     assert set(comic.habits) == {"timing", "palette", "ink", "halftone", "grain", "misregistration"}

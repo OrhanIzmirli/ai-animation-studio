@@ -8,7 +8,10 @@ writes to spikes/output/style/ (git-ignored):
     before_after_<run>_<recipe>.mp4   raw left, styled right, labelled, 24 fps
     contact_<run>_<recipe>.png        frames 0 / 48 / 96 / 120: raw row, styled row
     face_<run>_<recipe>.png           frame 120, head-and-shoulders crop, raw | styled
-    table.md                          metrics raw vs styled
+    sign_<run>_<recipe>.png           frame 60, the billboard (an accent colour), raw | styled
+    shoe_<run>_<recipe>.png           frame 120, lower right corner (a pale neutral), raw | styled
+    table.md                          metrics raw vs styled, with luminance_shift and
+                                      accent_retention (ai_studio.post.measures) on every 8th frame
 
 The crop box is the one used in experiment E1 (docs/experiments/E1_REPORT.md).
 """
@@ -25,6 +28,7 @@ from PIL import Image, ImageDraw, ImageFont
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
+from ai_studio.post.measures import accent_retention, luminance_shift  # noqa: E402
 from ai_studio.quality.frames import decode_video  # noqa: E402
 from ai_studio.quality.metrics import HELD_FRAME_THRESHOLD, hold_pattern_periodicity  # noqa: E402
 from ai_studio.video_encode import encode_frames  # noqa: E402
@@ -33,6 +37,8 @@ BENCHMARK = "comic_rooftop_01"
 OUT = REPO / "spikes" / "output" / "style"
 FRAMES = (0, 48, 96, 120)
 HEAD_BOX = (160, 100, 660, 420)
+SIGN_BOX = (1130, 300, 1280, 460)  # the pink billboard on the right (an accent colour), chosen by eye
+SHOE_BOX = (600, 560, 800, 704)  # in seed 3 the white shoe at frame 120; elsewhere the ledge
 LABEL = 30
 KEYS = ("motion_mean", "motion_max", "total_change", "start_frame_psnr", "temporal_pulse_ratio",
         "luminance_flicker", "luminance_min", "luminance_max", "held_frame_ratio", "hold_pattern_periodicity")
@@ -73,7 +79,7 @@ def main(run_ids: list[str]) -> int:
         short = run_id.split("-")[-1]
         run_dir = REPO / "outputs" / BENCHMARK / run_id
         metrics, version = raw_metrics(run_id)
-        rows.append((f"`{short}` raw", version, "-", "-", metrics))
+        rows.append((f"`{short}` raw", version, "-", "-", None, None, metrics))
         if not (run_dir / "out.mp4").is_file():
             print(f"{run_id}: raw video missing, skipped")
             continue
@@ -84,8 +90,21 @@ def main(run_ids: list[str]) -> int:
             styled = decode_video(variant.parent / "out.mp4", analysis_width=None, gray=False)
             measured = json.loads((REPO / manifest["metrics_file"]).read_text(encoding="utf-8"))
             timing = manifest["timing"]
+            sample = list(range(0, len(raw), 8))
+            shown = raw[np.array(timing["drawings"])[sample]]  # the raw drawing each styled frame shows
             rows.append((f"`{short}` + `{recipe}`", f"v{measured['metrics_version']}",
-                         str(timing["drawing_count"]), str(timing["hold_pattern_periodicity"]), measured["metrics"]))
+                         str(timing["drawing_count"]), str(timing["hold_pattern_periodicity"]),
+                         luminance_shift(shown, styled[sample]), accent_retention(shown, styled[sample]),
+                         measured["metrics"]))
+            for tag, frame_index, (left, top, right, bottom) in (
+                ("sign", 60, SIGN_BOX), ("shoe", 120, SHOE_BOX),
+            ):
+                crops = [Image.fromarray(clip[frame_index][top:bottom, left:right]).resize((760, 720), Image.Resampling.LANCZOS)
+                         for clip in (raw, styled)]
+                both = Image.new("RGB", (1520, 720 + LABEL))
+                both.paste(labelled(crops[0], f"raw, frame {frame_index}"), (0, 0))
+                both.paste(labelled(crops[1], f"{recipe}, frame {frame_index}"), (760, 0))
+                both.save(OUT / f"{tag}_{short}_{recipe}.png")
 
             bar_raw = np.asarray(labelled(Image.new("RGB", (raw.shape[2], 0)), f"{short}  raw"))
             bar_styled = np.asarray(labelled(Image.new("RGB", (raw.shape[2], 0)), f"{short}  {recipe}"))
@@ -124,10 +143,14 @@ def main(run_ids: list[str]) -> int:
     def cell(value):
         return "-" if value is None else (f"{value:.3f}" if isinstance(value, float) else str(value))
 
-    header = ["video", "metrics", "drawings", "periodicity (true pattern)", *KEYS]
+    header = ["video", "metrics", "drawings", "periodicity (true pattern)", "luminance_shift",
+              "accent_retention", *KEYS]
     lines = ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
-    for name, version, drawings, true_periodicity, metrics in rows:
-        lines.append("| " + " | ".join([name, version, drawings, true_periodicity, *(cell(metrics.get(k)) for k in KEYS)]) + " |")
+    for name, version, drawings, true_periodicity, shift, retention, metrics in rows:
+        lines.append("| " + " | ".join([
+            name, version, drawings, true_periodicity,
+            "-" if shift is None else f"{shift:+.2f}", cell(retention), *(cell(metrics.get(k)) for k in KEYS),
+        ]) + " |")
     (OUT / "table.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
     return 0

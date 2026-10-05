@@ -1,0 +1,54 @@
+# Artist profile: printed-comic finish, version 2.
+#
+# Same hand as comic_finish_v1 (same seed, same timing, ink weights, wobble,
+# grain). Changed habits, from what v1 measured on the first clips:
+#   - the palette reserves slots for small saturated accents of the start
+#     frame, so signs and coloured lights keep their hue;
+#   - ink and halftone no longer darken the picture: ink is compensated by
+#     slightly lighter fills, halftone lightens the paper between its dots.
+#
+# A profile is immutable once videos were made with it. To change a habit,
+# copy this file to comic_finish_v3.yaml. Parameters: docs/STYLE_LAYER.md.
+
+name: comic_finish
+version: 2
+description: >-
+  Printed-comic finish: animator timing, limited palette from the start frame
+  with reserved accent colours, content-aware ink lines with slight wobble,
+  tone-preserving halftone shadows, paper grain, 1 px misregistration.
+seed: 1701          # the same hand as v1
+
+habits:
+  timing:
+    mode: animator
+    still_below: 1.0
+    moderate_below: 3.0
+    hysteresis: 0.2
+    lookahead: 3
+    rhythm_break: [3, 6]
+  palette:
+    k: 24
+    strength: 1.0
+    accent_slots: 6         # of the 24 colours, kept for small saturated accents
+  ink:
+    strength: 0.75
+    thickness: [1.0, 3.5]
+    threshold: 36
+    shadow_bias: 0.6
+    contrast_bias: 0.4
+    taper: 0.6
+    pressure_variation: 0.25
+    boil_px: 0.6
+    noise_scale: 96
+    preserve_luminance: true
+  halftone:
+    dot_size: 6
+    threshold: 55
+    strength: 0.4
+    variation: 0.15
+    preserve_tone: true
+  grain:
+    amount: 2.5
+    shadow_gain: 1.0
+  misregistration:
+    px: 1

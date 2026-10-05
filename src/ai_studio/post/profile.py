@@ -42,7 +42,9 @@ import yaml
 from ai_studio.post import operations, timing
 from ai_studio.quality.metrics import hold_pattern_periodicity, transition_diffs
 
-POST_VERSION = "1"  # version of the operations' definitions
+# Version of the operations' definitions. 2: + accent slots, luminance / tone
+# preservation. 3: + accent_pixel_saturation. Earlier profiles give the same output.
+POST_VERSION = "3"
 HABIT_ORDER = ("timing", "palette", "ink", "halftone", "bloom", "grain", "misregistration")
 MOTION_ANALYSIS_WIDTH = 320  # motion for the timing is measured like the quality metrics
 
@@ -55,12 +57,18 @@ HABIT_PARAMETERS: dict[str, dict[str, Any]] = {
         "still_below": 1.0, "moderate_below": 3.0, "hysteresis": 0.2, "lookahead": 3,
         "rhythm_break": [3, 6],
     },
-    "palette": {"k": REQUIRED, "strength": 1.0},
+    "palette": {
+        "k": REQUIRED, "strength": 1.0, "accent_slots": 0, "accent_saturation": 0.55, "accent_value": 0.35,
+        "accent_pixel_saturation": 0.0,
+    },
     "ink": {
         "strength": REQUIRED, "thickness": REQUIRED, "threshold": 28.0, "shadow_bias": 0.6,
         "contrast_bias": 0.4, "taper": 0.6, "pressure_variation": 0.25, "boil_px": 0.0, "noise_scale": 96.0,
+        "preserve_luminance": False,
     },
-    "halftone": {"dot_size": REQUIRED, "threshold": REQUIRED, "strength": 0.5, "variation": 0.15},
+    "halftone": {
+        "dot_size": REQUIRED, "threshold": REQUIRED, "strength": 0.5, "variation": 0.15, "preserve_tone": False,
+    },
     "bloom": {"threshold": REQUIRED, "radius": REQUIRED, "strength": REQUIRED},
     "grain": {"amount": REQUIRED, "shadow_gain": 1.0},
     "misregistration": {"px": REQUIRED},
@@ -191,18 +199,23 @@ def apply_profile(
         if p is None or habit == "timing":
             continue
         if habit == "palette":
-            stack = operations.palette_limit(stack, p["k"], source_image, seed=seed, strength=p["strength"])
+            stack = operations.palette_limit(
+                stack, p["k"], source_image, seed=seed, strength=p["strength"], accent_slots=p["accent_slots"],
+                accent_saturation=p["accent_saturation"], accent_value=p["accent_value"],
+                accent_pixel_saturation=p["accent_pixel_saturation"],
+            )
         elif habit == "ink":
             thickness = p["thickness"]
             stack = operations.ink_lines(
                 stack, p["strength"], tuple(thickness) if isinstance(thickness, list) else thickness,
                 threshold=p["threshold"], shadow_bias=p["shadow_bias"], contrast_bias=p["contrast_bias"],
                 taper=p["taper"], pressure_variation=p["pressure_variation"], boil_px=p["boil_px"],
-                noise_scale=p["noise_scale"], seed=seed, ids=id_list,
+                noise_scale=p["noise_scale"], preserve_luminance=p["preserve_luminance"], seed=seed, ids=id_list,
             )
         elif habit == "halftone":
             stack = operations.halftone(
-                stack, p["dot_size"], p["threshold"], strength=p["strength"], variation=p["variation"], seed=seed,
+                stack, p["dot_size"], p["threshold"], strength=p["strength"], variation=p["variation"],
+                preserve_tone=p["preserve_tone"], seed=seed,
             )
         elif habit == "bloom":
             stack = operations.bloom(stack, p["threshold"], p["radius"], p["strength"])
