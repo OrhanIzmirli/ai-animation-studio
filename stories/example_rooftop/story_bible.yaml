@@ -1,0 +1,59 @@
+# EXAMPLE story bible. A worked example of the format, built only from what
+# the repository already records about benchmark comic_rooftop_01 and
+# COMIC_HERO_01. It is NOT the story of trailer_01; it exists so that
+# docs/STORY_LAYER.md has real files to point to and the tests have something
+# to load. Format: src/ai_studio/story/loading.py, docs/STORY_LAYER.md.
+#
+# Original material only: no existing characters, titles, logos or costumes.
+
+story_id: example_rooftop
+title: Example - the rooftop
+status: draft          # draft | ready; ready is set by a human, never inferred
+
+logline: >-
+  A young man sits on a rooftop ledge at sunset and watches his city light up.
+
+synopsis: >-
+  Two shots. The city at late sunset, seen from above. Then the young man on
+  the ledge, seen from behind; near the end he turns his head slightly toward
+  the camera.
+
+themes:
+  - stillness before something begins
+tone: quiet, cinematic
+setting: a dense city seen from its rooftops, late sunset, city lights starting to glow
+world_rules:
+  - the hero's face is never covered
+
+visual_style:
+  summary: Graphic novel style animated shot, hybrid 2D and 3D animation
+  # -> visual_direction of every request
+  direction:
+    - strong ink contours
+    - controlled cel shading
+    - halftone print texture
+    - hand-drawn hatching in the shadows
+    - layered city background with depth
+    - limited stepped animation timing
+  # -> negative prompt of every shot that has none of its own
+  negative:
+    - photorealistic
+    - live action
+    - 3D render look
+    - glossy plastic shading
+    - soft airbrushed gradients
+    - motion blur smear
+    - flickering lines
+    - boiling line art
+    - warping buildings
+    - text
+    - logo
+    - watermark
+  artist_profile: comic_finish_v1    # configs/style_recipes/comic_finish_v1.yaml
+
+characters:
+  - COMIC_HERO_01
+
+originality_notes: >-
+  Not based on any existing character, franchise or costume
+  (benchmarks/references/comic_hero_01/README.md).
