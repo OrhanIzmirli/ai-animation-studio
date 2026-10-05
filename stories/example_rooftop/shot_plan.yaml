@@ -1,0 +1,78 @@
+# EXAMPLE shot plan (see story_bible.yaml in this folder). Two shots, 9 s.
+# Planning data: nothing here generates video. Every shot is a draft until a
+# human sets "status: ready".
+#
+# Durations must add up: shots -> scene -> total_duration_seconds, and every
+# shot must be a whole number of frames at fps.
+
+plan_id: example_rooftop_plan
+story_id: example_rooftop
+status: draft
+fps: 24
+resolution: {width: 1280, height: 704}
+total_duration_seconds: 9
+
+# Shared assets that belong to no character (environment plates, props).
+assets:
+  - id: city_sunset_plate
+    kind: environment
+    path: stories/example_rooftop/assets/city_sunset_plate.png
+    status: missing
+    description: the city at late sunset from high above the rooftops, no people
+
+scenes:
+  - id: scene_01
+    name: The rooftop at sunset
+    location: a high rooftop over a dense city
+    time_of_day: late sunset, city lights beginning to glow
+    summary: The city, then the young man who is watching it.
+    duration_seconds: 9
+    shots:
+      - id: shot_01
+        name: The city at sunset
+        shot_type: establishing
+        camera: slow cinematic push-in from high above the rooftops
+        motion:
+          - a few windows and street lights begin to glow
+          - thin clouds drift slowly
+        duration_seconds: 4
+        characters: []
+        action: >-
+          A dense city at late sunset, layered towers and water tanks, long
+          orange light and deep violet shadows; the first windows and street
+          lights begin to glow
+        keyframes:
+          - id: start
+            role: start_frame
+            description: the establishing view of the city, frame 0
+            status: missing          # nobody has made this image yet
+        continuity:
+          - same sunset colour and light direction as shot_02
+        status: draft
+
+      - id: shot_02
+        name: The young man on the ledge
+        shot_type: wide
+        camera: slow cinematic push-in from a low three-quarter angle behind the character
+        motion:
+          - character sits on the rooftop ledge and remains mostly stationary
+          - subtle wind moves hair and clothing
+          - near the end, a slight head turn toward the camera
+        duration_seconds: 5
+        characters: [COMIC_HERO_01]
+        action: >-
+          Seen from behind, he sits on the edge of the rooftop ledge looking
+          out over the city; subtle wind moves his hair and clothing; near the
+          end he slowly turns his head slightly toward the camera
+        keyframes:
+          - id: start
+            role: start_frame
+            description: the hero on the ledge from behind, frame 0
+            character: COMIC_HERO_01
+            status: available
+            asset_sha256: 3a3e76750196317ee5142d7d6d00d2c68af58a993ee54ca8cc9fa665dbf1e0fb
+        continuity:
+          - same city, sunset colour and light direction as shot_01
+          - clothing and backpack exactly as in rooftop_frame_v001.png
+          - the face must not be invented - it has no reference yet, so keep the head turn slight
+        status: draft

@@ -1,0 +1,66 @@
+# EXAMPLE character bible (see story_bible.yaml in this folder).
+# The design and the one available asset are copied from
+# benchmarks/references/comic_hero_01/README.md; the other assets are the ones
+# that README lists as planned, recorded here as missing.
+#
+# An asset is identified by the SHA-256 of its file. "status: available" needs
+# the hash; "status: missing" means the image has not been made and must have
+# no hash. Media files are git-ignored - the hash is what git remembers.
+
+characters:
+  - id: COMIC_HERO_01
+    name: The young man on the rooftop     # placeholder; naming him is a human decision
+    role: protagonist
+    description: >-
+      A young man with curly dark hair, wearing dark hooded streetwear with
+      subtle dark-red accents, dark trousers and light sneakers, carrying a
+      dark backpack with subtle red detailing
+    appearance:
+      - young man
+      - curly dark hair
+    wardrobe:
+      - dark hooded streetwear with subtle dark-red accents
+      - dark trousers
+      - light sneakers
+      - dark backpack with subtle red detailing
+    never:
+      - mask
+      - logo
+      - emblem
+      - text on the clothing
+      - superhero costume
+    notes: >-
+      Only features visible in rooftop_frame_v001.png are part of the design.
+      His face has never been drawn: that frame shows him from behind.
+    reference_assets:
+      - id: rooftop_frame_v001
+        kind: start_frame
+        path: benchmarks/references/comic_hero_01/rooftop_frame_v001.png
+        status: available
+        sha256: 3a3e76750196317ee5142d7d6d00d2c68af58a993ee54ca8cc9fa665dbf1e0fb
+        description: canonical frame 0 of comic_rooftop_01, 1672x941 PNG, seen from behind
+      - id: front
+        kind: front
+        path: benchmarks/references/comic_hero_01/front.png
+        status: missing
+        description: full body, front view, neutral pose
+      - id: three_quarter
+        kind: three_quarter
+        path: benchmarks/references/comic_hero_01/three_quarter.png
+        status: missing
+        description: full body, three-quarter view
+      - id: profile
+        kind: profile
+        path: benchmarks/references/comic_hero_01/profile.png
+        status: missing
+        description: full body, side view
+      - id: face_closeup
+        kind: face_closeup
+        path: benchmarks/references/comic_hero_01/face_closeup.png
+        status: missing
+        description: head and shoulders, neutral expression
+      - id: style_frame
+        kind: style_frame
+        path: benchmarks/references/comic_hero_01/style_frame.png
+        status: missing
+        description: one finished frame in the target look
