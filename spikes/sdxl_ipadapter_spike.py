@@ -7,10 +7,18 @@ benchmarks/; the reference is only read and a cleaned, cropped copy goes to
 OUT (default spikes/output/sdxl_ipadapter/, which is git-ignored).
 
     python spikes/sdxl_ipadapter_spike.py [--weights 0.4 0.6 0.8] [--out FOLDER] [--copy-to FOLDER]
+    python spikes/sdxl_ipadapter_spike.py --weights 0.8 --tag lineart_a
+        --control-image spikes/output/sdxl_ipadapter/sdxl_ipadapter_test_w08.png
+        [--control-strength 0.8] [--control-end 1.0] [--positive-add TEXT] [--negative-add TEXT]
 
 Starts ComfyUI (or reuses a running one), checks that the IPAdapter nodes
 loaded, runs one prompt per IP-Adapter weight (same seed, prompt and
 reference), and reports time and peak VRAM / RAM use per image.
+
+--control-image adds the Lineart T2I-Adapter: the lines of that image hold
+the composition of the new one. The lines are extracted with ComfyUI's
+built-in Canny node (no preprocessor model is installed) and saved beside
+the result as <name>_lines.png.
 """
 
 from __future__ import annotations
@@ -43,6 +51,7 @@ WEIGHT_TYPE = "ease out"
 CHECKPOINT = "sd_xl_base_1.0.safetensors"
 IPADAPTER = "ip-adapter-plus_sdxl_vit-h.safetensors"
 CLIP_VISION = "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors"
+T2I_LINEART = "t2i-adapter-lineart-sdxl-1.0.fp16.safetensors"
 WIDTH, HEIGHT, STEPS, CFG, SEED = 1024, 1024, 25, 6.0, 42
 POSITIVE = (
     "graphic novel illustration, a young man with short curly dark hair sitting on a park bench, "
@@ -63,11 +72,15 @@ def clean_reference() -> "Image.Image":
         return sheet.crop(CROP_BOX)
 
 
-def workflow(image_name: str, weight: float) -> dict:
-    return {
+def workflow(
+    image_name: str, weight: float, positive: str = POSITIVE, negative: str = NEGATIVE, seed: int = SEED,
+    control: dict | None = None,
+) -> dict:
+    """control: {"image": uploaded name, "strength", "end", "canny": (low, high)} or None."""
+    nodes = {
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": CHECKPOINT}},
-        "2": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": POSITIVE}},
-        "3": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": NEGATIVE}},
+        "2": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": positive}},
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["1", 1], "text": negative}},
         "4": {"class_type": "EmptyLatentImage", "inputs": {"width": WIDTH, "height": HEIGHT, "batch_size": 1}},
         "5": {"class_type": "LoadImage", "inputs": {"image": image_name}},
         "6": {"class_type": "IPAdapterModelLoader", "inputs": {"ipadapter_file": IPADAPTER}},
@@ -79,12 +92,26 @@ def workflow(image_name: str, weight: float) -> dict:
         }},
         "9": {"class_type": "KSampler", "inputs": {
             "model": ["8", 0], "positive": ["2", 0], "negative": ["3", 0], "latent_image": ["4", 0],
-            "seed": SEED, "steps": STEPS, "cfg": CFG, "sampler_name": "dpmpp_2m", "scheduler": "karras",
+            "seed": seed, "steps": STEPS, "cfg": CFG, "sampler_name": "dpmpp_2m", "scheduler": "karras",
             "denoise": 1.0,
         }},
         "10": {"class_type": "VAEDecode", "inputs": {"samples": ["9", 0], "vae": ["1", 2]}},
         "11": {"class_type": "SaveImage", "inputs": {"images": ["10", 0], "filename_prefix": "ai_studio_sdxl_ipa_spike"}},
     }
+    if control is not None:
+        low, high = control["canny"]
+        nodes.update({
+            "20": {"class_type": "LoadImage", "inputs": {"image": control["image"]}},
+            "21": {"class_type": "Canny", "inputs": {"image": ["20", 0], "low_threshold": low, "high_threshold": high}},
+            "22": {"class_type": "ControlNetLoader", "inputs": {"control_net_name": T2I_LINEART}},
+            "23": {"class_type": "ControlNetApplyAdvanced", "inputs": {
+                "positive": ["2", 0], "negative": ["3", 0], "control_net": ["22", 0], "image": ["21", 0],
+                "strength": control["strength"], "start_percent": 0.0, "end_percent": control["end"],
+            }},
+            "24": {"class_type": "SaveImage", "inputs": {"images": ["21", 0], "filename_prefix": "ai_studio_sdxl_ipa_spike_lines"}},
+        })
+        nodes["9"]["inputs"]["positive"], nodes["9"]["inputs"]["negative"] = ["23", 0], ["23", 1]
+    return nodes
 
 
 class _MemoryStatus(ctypes.Structure):
@@ -136,7 +163,20 @@ def main() -> int:
     parser.add_argument("--weights", type=float, nargs="+", default=[0.4, 0.6, 0.8], help="IP-Adapter weights, one image each")
     parser.add_argument("--copy-to", default=None, help="also copy the results here (e.g. the Desktop)")
     parser.add_argument("--crop-only", action="store_true", help="write the cleaned reference crop and stop")
+    parser.add_argument("--tag", default=None, help="name of this try: result sdxl_ipadapter_<tag>.png, report_<tag>.json (one weight)")
+    parser.add_argument("--seed", type=int, default=SEED)
+    parser.add_argument("--positive-add", default="", help="text appended to the positive prompt")
+    parser.add_argument("--negative-add", default="", help="text appended to the negative prompt")
+    parser.add_argument("--control-image", default=None, help="image whose lines hold the composition (Lineart T2I-Adapter)")
+    parser.add_argument("--control-strength", type=float, default=0.8)
+    parser.add_argument("--control-end", type=float, default=1.0, help="fraction of the steps the adapter acts on")
+    parser.add_argument("--canny", type=float, nargs=2, default=[0.4, 0.8], metavar=("LOW", "HIGH"))
     args = parser.parse_args()
+    if args.tag and len(args.weights) != 1:
+        parser.error("--tag needs exactly one weight")
+    positive = POSITIVE + (", " + args.positive_add if args.positive_add else "")
+    negative = NEGATIVE + (", " + args.negative_add if args.negative_add else "")
+    report_name = f"report_{args.tag}.json" if args.tag else "report.json"
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
 
@@ -149,8 +189,12 @@ def main() -> int:
     report: dict = {
         "checkpoint": CHECKPOINT, "ipadapter": IPADAPTER, "clip_vision": CLIP_VISION,
         "weight_type": WEIGHT_TYPE, "images": [],
-        "width": WIDTH, "height": HEIGHT, "steps": STEPS, "cfg": CFG, "seed": SEED,
-        "positive": POSITIVE, "negative": NEGATIVE, "reference": str(REFERENCE.relative_to(ROOT)),
+        "width": WIDTH, "height": HEIGHT, "steps": STEPS, "cfg": CFG, "seed": args.seed,
+        "positive": positive, "negative": negative, "reference": str(REFERENCE.relative_to(ROOT)),
+        "control": None if args.control_image is None else {
+            "adapter": T2I_LINEART, "lines_from": args.control_image, "line_extractor": "ComfyUI Canny node",
+            "canny": args.canny, "strength": args.control_strength, "end": args.control_end,
+        },
         "reference_crop_box": CROP_BOX, "reference_text_painted_over": TEXT_BOX,
         "ram_available_before_gb": round(available_ram_gb(), 2), "vram_used_before_mib": vram_used_mib(),
     }
@@ -162,8 +206,8 @@ def main() -> int:
         report["comfyui_started_by_spike"] = server.started_by_us
         report["comfyui_startup_seconds"] = round(time.perf_counter() - started, 1)
         client = server.client
-        missing = [n for n in ("IPAdapterAdvanced", "IPAdapterModelLoader", "CLIPVisionLoader")
-                   if client.node_info(n) is None]
+        missing = [n for n in ("IPAdapterAdvanced", "IPAdapterModelLoader", "CLIPVisionLoader", "Canny",
+                               "ControlNetApplyAdvanced") if client.node_info(n) is None]
         log = server.log_path.read_text(encoding="utf-8", errors="replace") if server.log_path else ""
         report["custom_node_import_failed"] = "IMPORT FAILED" in log and "IPAdapter" in log.split("IMPORT FAILED", 1)[1][:400]
         if missing or report["custom_node_import_failed"]:
@@ -172,15 +216,23 @@ def main() -> int:
             return 1
 
         image_name = client.upload_image(crop_path, "ai_studio_sdxl_ipa_spike_reference.png")
+        control = None
+        if args.control_image is not None:
+            control = {
+                "image": client.upload_image(Path(args.control_image), "ai_studio_sdxl_ipa_spike_control.png"),
+                "strength": args.control_strength, "end": args.control_end, "canny": tuple(args.canny),
+            }
         monitor.start()
         for weight in args.weights:
             started = time.perf_counter()
-            prompt_id = client.queue_prompt(workflow(image_name, weight))
+            prompt_id = client.queue_prompt(workflow(image_name, weight, positive, negative, args.seed, control))
             outputs = client.wait_for_prompt(prompt_id, timeout_seconds=1800)
             seconds = round(time.perf_counter() - started, 1)  # the first image includes loading the models
-            images = [image for node in outputs.values() for image in node.get("images", [])]
-            result = out / f"sdxl_ipadapter_test_w{round(weight * 10):02d}.png"
-            result.write_bytes(client.view(images[0]))
+            name = f"sdxl_ipadapter_{args.tag}" if args.tag else f"sdxl_ipadapter_test_w{round(weight * 10):02d}"
+            result = out / f"{name}.png"
+            result.write_bytes(client.view(outputs["11"]["images"][0]))
+            if "24" in outputs:
+                (out / f"{name}_lines.png").write_bytes(client.view(outputs["24"]["images"][0]))
             report["images"].append({
                 "ipadapter_weight": weight, "seconds": seconds, "result": str(result),
                 "vram_peak_so_far_mib": monitor.vram_peak, "ram_available_lowest_so_far_gb": round(monitor.ram_low, 2),
@@ -197,13 +249,13 @@ def main() -> int:
         if server.log_path is not None:
             report["comfyui_log"] = str(server.log_path)
         server.close()
-        (out / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+        (out / report_name).write_text(json.dumps(report, indent=2), encoding="utf-8")
         if args.copy_to and not args.crop_only:
             import shutil
 
             target = Path(args.copy_to)
             target.mkdir(parents=True, exist_ok=True)
-            for name in ["reference_crop_clean.png", "report.json", *(Path(i["result"]).name for i in report["images"])]:
+            for name in ["reference_crop_clean.png", report_name, *(Path(i["result"]).name for i in report["images"])]:
                 shutil.copy2(out / name, target / name)
         print(json.dumps(report, indent=2))
 

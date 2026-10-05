@@ -1,0 +1,99 @@
+# Spike: SDXL base + IP-Adapter (+ Lineart T2I-Adapter) in the local ComfyUI
+
+Date: 2026-10-05. Laptop: RTX 4060 Laptop 8 GB, 15.7 GB RAM, ComfyUI v0.38.2.
+Research behind it: `docs/research/LOCAL_IMAGE_BACKEND.md`.
+Script: `spikes/sdxl_ipadapter_spike.py`. Images: `spikes/output/sdxl_ipadapter/`
+(git-ignored), each with a `report*.json` holding the exact settings.
+
+Feasibility only. Nothing here is a benchmark run; nothing was written under
+`outputs/` or `benchmarks/`. Judgements of the pictures are mine, from
+looking at each image once; no metric was computed.
+
+## Setup
+
+- `sd_xl_base_1.0.safetensors`, `ip-adapter-plus_sdxl_vit-h.safetensors`,
+  CLIP ViT-H image encoder, `t2i-adapter-lineart-sdxl-1.0.fp16.safetensors`;
+  custom node `ComfyUI_IPAdapter_plus` (commit `a0f451a`), loads without
+  errors.
+- 1024x1024, 25 steps, CFG 6, dpmpp_2m / karras, seed 42 unless noted.
+- Reference: a 300x300 crop of the front figure (head to waist) of
+  `benchmarks/references/comic_hero_01/character_turnaround_hero_01.jpg`, with
+  the handwritten note beside the hair painted over. The sheet is only read.
+- Prompt: the character "sitting on a park bench, three-quarter view,
+  daylight" plus the outfit.
+
+## Results
+
+| Image | IP-Adapter | Lineart adapter | Prompt change | Result |
+|---|---|---|---|---|
+| `sdxl_ipadapter_test_01.png` (Desktop only) | 0.8, linear, crop with label text | - | - | Copy of the reference: front view, no bench, invented handwriting |
+| `..._test_w04.png` | 0.4, ease out, clean crop | - | - | Pose from the prompt; loosest identity; jacket open over a T-shirt, grey |
+| `..._test_w06.png` | 0.6 | - | - | Pose from the prompt; face closer; jacket open, grey; a wristwatch appears |
+| `..._test_w08.png` | 0.8 | - | - | Pose from the prompt; closest face and outfit (zipped hoodie, red straps); jacket grey; wristwatch |
+| `..._lineart_a.png` | 0.8 | lines of w08, strength 0.8, to the last step | + "pure black jacket"; negative + "no watch, no wristwatch" | **Broken**: a mesh of white strokes and red smears, no figure |
+| `..._lineart_b.png` | 0.8 | strength 0.4, first half of the steps | same | Clean. Same layout as w08, no watch, hands changed. Jacket grey with dark-red sleeves and hood: colour is worse |
+| `..._prompt_only_c.png` | 0.8 | - | same | Clean. No watch. Jacket still grey, and a small chest logo appears |
+| `..._lineart_d.png` | 0.8 | strength 0.6, first 70 % | + "(pure black jacket:1.4), black sleeves, black hood"; negative + "watch, wristwatch, bracelet, grey jacket, red jacket, red sleeves" | **Broken**, like a |
+| `..._lineart_e_seed43.png` | 0.8 | as d, seed 43 | as d | **Broken**; the strokes follow w08's lines, so the adapter does drive the layout |
+
+`<name>_lines.png` beside each lineart image is the line picture the adapter
+received.
+
+## What holds
+
+- **IP-Adapter at 0.8 with "ease out"** ("prompt is more important") and a
+  text-free crop gives a new pose from the prompt and a recognisably similar
+  character: curly hair, face type, hooded zip jacket with drawstrings,
+  dark-red backpack straps with buckles. It is the best setting found.
+- The first run's copying was caused by the weight type and the label text
+  in the crop, not by the weight: 0.4, 0.6 and 0.8 all follow the prompt.
+- The stack fits: peak VRAM 6.8 to 6.9 GB of 8.2 GB with or without the
+  lineart adapter; about 31 to 34 s per image including loading the models
+  (sampling about 17 s). No crash, no out-of-memory.
+- A negative prompt removes the wristwatch (b and c).
+
+## What does not
+
+1. **The jacket is never black.** Grey in every image, with or without
+   "pure black jacket", weighted or not. Not solved.
+2. **The Lineart T2I-Adapter is not usable as set up.** At strength 0.6 and
+   0.8 it destroys the picture; at 0.4 over the first half of the steps the
+   picture is clean, but then its effect cannot be told apart from the seed
+   (b has the same layout as w08, which shares its seed). Cause not
+   established. Candidates, none tested: the lines come from ComfyUI's Canny
+   node because no lineart preprocessor is installed, and one-pixel Canny
+   edges are not what this adapter was trained on; or a problem in how this
+   ComfyUI version applies this adapter file.
+3. **Identity is "similar", not "the same".** The face is the same type in
+   every image, not the same face, and details drift (chest logo in c, open
+   jacket at low weights).
+4. Small invented details keep appearing and have to be named in the
+   negative prompt one by one.
+
+## Memory
+
+| Run | Seconds | Peak VRAM | RAM available before | lowest |
+|---|---|---|---|---|
+| w04 / w06 / w08 (one session) | 50.0 / 35.3 / 31.3 | 6,823 MiB | 3.36 GB | 0.79 GB |
+| lineart_a | 32.4 | 6,913 MiB | 8.21 GB | 1.12 GB |
+| lineart_b | 32.4 | 6,849 MiB | 8.65 GB | 1.72 GB |
+| prompt_only_c | 31.3 | 6,815 MiB | 8.76 GB | 2.01 GB |
+| lineart_d | 32.3 | 6,881 MiB | 4.78 GB | 1.47 GB |
+| lineart_e_seed43 | 33.5 | 6,849 MiB | 4.76 GB | 1.50 GB |
+
+VRAM is the whole GPU as reported by `nvidia-smi`, sampled twice a second.
+Available RAM falls to 1 to 2 GB even when 8 GB were free at the start:
+ComfyUI keeps models cached in RAM as long as there is room. Nothing failed
+because of it.
+
+## Open, for a decision
+
+- Composition locking (the shot_04 start / end problem) is not shown to work.
+  Options that need a download and therefore approval: the small Canny
+  ControlNet (320 MB, OpenRAIL++), which matches the Canny lines we can
+  already make; or a lineart preprocessor for the adapter we have. An option
+  that needs no download: image-to-image from the start frame at low denoise.
+- The jacket colour and exact identity probably need either image-to-image
+  from an approved image or the small character LoRA from the research note.
+- Whether "recognisably similar" is good enough for keyframes is the owner's
+  call after looking at w08, b and c.
