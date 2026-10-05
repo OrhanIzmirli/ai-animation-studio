@@ -153,8 +153,11 @@ def motion_of(frames: np.ndarray) -> np.ndarray:
     frames = np.asarray(frames)
     factor = max(1, frames.shape[2] // MOTION_ANALYSIS_WIDTH)
     height, width = (frames.shape[1] // factor) * factor, (frames.shape[2] // factor) * factor
-    gray = (frames[:, :height, :width].astype(np.float32) @ np.array([0.299, 0.587, 0.114], dtype=np.float32))
-    small = gray.reshape(len(frames), height // factor, factor, width // factor, factor).mean(axis=(2, 4))
+    weights = np.array([0.299, 0.587, 0.114], dtype=np.float32)
+    small = np.empty((len(frames), height // factor, width // factor), dtype=np.float32)
+    for index in range(len(frames)):  # one frame at a time: a float32 copy of the whole clip is about 1.3 GB
+        gray = frames[index, :height, :width].astype(np.float32) @ weights
+        small[index] = gray.reshape(height // factor, factor, width // factor, factor).mean(axis=(1, 3))
     return transition_diffs(small)
 
 
