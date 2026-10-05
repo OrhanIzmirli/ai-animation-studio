@@ -195,18 +195,19 @@ def run_benchmark(
             out(line)
     written = _written_paths(logger, definition.benchmark_id, run_id, root, out)
     if metrics and not record.image_output:  # the automatic metrics are video metrics
-        written += _measure(logger, definition.benchmark_id, run_id, root, out)
+        written += _measure(logger, definition.benchmark_id, run_id, root, out, definition.regions)
     return EXIT_SUCCESS, written
 
 
 def _measure(
     logger: BenchmarkLogger, benchmark_id: str, run_id: str, root: Path, out: Callable[[str], None],
+    regions: Any = None,
 ) -> list[str]:
     """Compute and store the quality metrics of a finished run. Never fatal:
     the run record is already saved."""
     store = VideoMetricsStore(metrics_dir(root), logger)
     try:
-        measured = store.measure_run(benchmark_id, run_id, root)
+        measured = store.measure_run(benchmark_id, run_id, root, regions=regions)
     except Exception as exc:  # metrics are an extra; any failure is only reported
         out(f"warning: quality metrics were not computed: {type(exc).__name__}: {exc}")
         return []
@@ -217,6 +218,10 @@ def _measure(
         f"start_frame_psnr {'n/a' if psnr is None else f'{psnr:.2f} dB'}, "
         f"pulse_ratio {'n/a' if values['temporal_pulse_ratio'] is None else format(values['temporal_pulse_ratio'], '.2f')}, "
         f"luminance_flicker {values['luminance_flicker']:.3f}, held_frame_ratio {values['held_frame_ratio']:.3f}")
+    for name, ratios in ((measured.region_metrics or {}).get("ratios") or {}).items():
+        out(f"region {name} / rest: " + ", ".join(
+            f"{measure} {'n/a' if value is None else format(value, '.2f')}" for measure, value in ratios.items()
+        ))
     path = to_project_relative(store.path_for(benchmark_id, run_id, measured.metrics_version), root)
     out(f"metrics: {path}")
     return [path]

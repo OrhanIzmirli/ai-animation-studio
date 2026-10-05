@@ -209,7 +209,7 @@ def test_metrics_have_no_thresholds_yet():
 
     config = yaml.safe_load((REPO_ROOT / "configs" / "quality.yaml").read_text(encoding="utf-8"))
     assert all(value is None for section in config.values() if isinstance(section, dict) for value in section.values())
-    assert METRICS_VERSION == "2"
+    assert METRICS_VERSION == "3"
 
 
 # --- analysis size ---
@@ -374,7 +374,7 @@ def store(project):
 def test_store_saves_under_run_and_version_and_roundtrips(store, project):
     record = sample_record()
     path = store.save(record)
-    assert path == project / "benchmarks" / "metrics" / BENCH / "run-1" / "metrics_v2.json"
+    assert path == project / "benchmarks" / "metrics" / BENCH / "run-1" / f"metrics_v{METRICS_VERSION}.json"
     assert store.exists(BENCH, "run-1") and store.load(BENCH, "run-1") == record
     assert json.loads(path.read_text(encoding="utf-8"))["video_sha256"] == "ab" * 32
 
@@ -390,7 +390,7 @@ def test_store_never_overwrites(store):
 def test_a_new_metrics_version_is_a_new_file(store):
     store.save(sample_record())
     store.save(sample_record(metrics_version="1"))
-    assert store.exists(BENCH, "run-1", "1") and store.exists(BENCH, "run-1", "2")
+    assert store.exists(BENCH, "run-1", "1") and store.exists(BENCH, "run-1", METRICS_VERSION)
 
 
 def test_store_rejects_failed_unknown_and_videoless_runs(store, project):
@@ -507,10 +507,10 @@ def test_measure_run_script(project, monkeypatch):
     metrics_root = project / "benchmarks" / "metrics" / BENCH
     assert [p.name for p in metrics_root.iterdir()] == ["20261001T000000Z-aaaaaaaa"]
 
-    stored = (metrics_root / "20261001T000000Z-aaaaaaaa" / "metrics_v2.json").read_bytes()
+    stored = (metrics_root / "20261001T000000Z-aaaaaaaa" / f"metrics_v{METRICS_VERSION}.json").read_bytes()
     code, lines = run(run_id="20261001T000000Z-aaaaaaaa")
     assert code == 0 and "already measured" in lines[2] and "WARNING" not in lines[2]
-    assert (metrics_root / "20261001T000000Z-aaaaaaaa" / "metrics_v2.json").read_bytes() == stored
+    assert (metrics_root / "20261001T000000Z-aaaaaaaa" / f"metrics_v{METRICS_VERSION}.json").read_bytes() == stored
 
     write_video(video, static_frames())  # the file changed after it was measured
     code, lines = run(run_id="20261001T000000Z-aaaaaaaa")

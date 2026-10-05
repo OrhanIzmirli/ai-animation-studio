@@ -39,6 +39,7 @@ from ai_studio.generation.request import (
     check_shot_control,
 )
 from ai_studio.paths import definitions_dir, resolve_path
+from ai_studio.quality.regions import AnalysisRegions
 
 
 DEFINITION_STATUSES = ("draft", "ready")
@@ -79,6 +80,12 @@ class BenchmarkDefinition:
     prompt: str | None = None
     negative_prompt: str | None = None
     notes: str = ""
+    # Optional, analysis only (never sent to a backend): named rectangles
+    # name -> [x0, y0, x1, y1] in pixels of a frame of analysis_regions_size
+    # [width, height]. The quality metrics measure each region against the
+    # rest of the frame (ai_studio.quality.regions).
+    analysis_regions: dict[str, list[int]] | None = None
+    analysis_regions_size: list[int] | None = None
 
     # video_editing only
     source_video: str | None = None
@@ -110,6 +117,10 @@ class BenchmarkDefinition:
         for name in ("reference_images", "preserve_regions"):
             if not isinstance(getattr(self, name), list):
                 raise ValueError(f"{name} must be a list")
+        if self.analysis_regions is not None:
+            self.regions  # validates; raises ValueError
+        elif self.analysis_regions_size is not None:
+            raise ValueError("analysis_regions_size is only meaningful with analysis_regions")
         allowed = TASK_FIELDS[self.task_type]
         not_applicable = [
             name for names in TASK_FIELDS.values() for name in names if name not in allowed
@@ -148,6 +159,13 @@ class BenchmarkDefinition:
                     raise ValueError(f"{name} must be a non-empty path")
                 if value in self.reference_images:
                     raise ValueError(f"{name} must not also be listed in reference_images")
+
+    @property
+    def regions(self) -> AnalysisRegions | None:
+        """The declared analysis regions, or None."""
+        if self.analysis_regions is None:
+            return None
+        return AnalysisRegions.from_definition(self.analysis_regions, self.analysis_regions_size)
 
     @property
     def is_complete(self) -> bool:

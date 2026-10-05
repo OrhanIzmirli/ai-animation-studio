@@ -1,4 +1,4 @@
-# Automatic video quality metrics (version 2)
+# Automatic video quality metrics (version 3)
 
 The first automatic, model-agnostic measurements of a generated video: the
 seed of the Quality Gate. They look only at decoded frames, never at the
@@ -10,7 +10,7 @@ model that made them.
 > measured so far, which is far too little to say what a good value is.
 
 Code: `src/ai_studio/quality/` (`frames.py` decoding, `metrics.py` pure
-functions, `store.py` measuring and storing). Command:
+functions, `regions.py` region metrics, `store.py` measuring and storing). Command:
 `scripts/measure_run.py`.
 
 ## How a video is measured
@@ -125,7 +125,8 @@ tool_versions {numpy, ffmpeg}, timestamp
 
 - **Never overwritten.** The file is created exclusively; measuring a run
   that already has metrics of the current version is refused.
-- **Versioned.** `METRICS_VERSION` (now `"2"`; version 2 added
+- **Versioned.** `METRICS_VERSION` (now `"3"`; version 3 added the region
+  metrics below and left every version-2 metric unchanged; version 2 added
   `hold_pattern_periodicity` and left every version-1 metric unchanged, so
   version-1 values of those metrics remain comparable) changes whenever a definition,
   a default or the decoding changes. A new version writes a new file next to
@@ -167,6 +168,69 @@ measured again; failed runs and runs whose video is not on this machine are
 listed as skipped. Commit the new `benchmarks/metrics/...json` files like run
 records.
 
+## Region metrics (new in v3)
+
+A model can draw one part of the picture differently from the rest, typically
+a soft, smoothly shaded face on a body drawn with ink lines and flat tones.
+Whole-frame numbers hide that. A benchmark definition may therefore name
+**analysis regions**, fixed rectangles in pixels of a stated frame size:
+
+```yaml
+analysis_regions:
+  head: [480, 80, 800, 400]        # x0, y0, x1, y1 (x1, y1 exclusive)
+analysis_regions_size: [1280, 704]  # the frame size those pixels refer to
+```
+
+They are analysis only: no backend sees them and no request changes. Each
+region and the **rest** of the frame (everything outside all regions) are
+measured on luma, on every frame, at width 640 (a second decode; line work
+disappears at 320), and averaged over the frames:
+
+| Measure | Definition | Reads as |
+|---|---|---|
+| `edge_density` | share of pixels with gradient magnitude >= 20 | contours, hatching, halftone dots |
+| `smooth_gradient_share` | share of pixels with gradient magnitude from 1 up to 20 | soft shading: neither flat nor an edge |
+| `ink_darkness` | mean darkness (0-1, 1 = black) of the darkest 10 % of the pixels | how black the darkest marks are |
+| `tone_count` | luma levels (steps of 8) that each hold at least 1 % of the pixels | few = cel shading, many = gradients |
+
+Gradient magnitude = length of the central-difference luma gradient, in luma
+units per pixel. The record stores the values per region and for the rest,
+and `ratios[region][measure] = region / rest` (`null` when the rest value is
+0). A soft face on an inked body shows as `edge_density` and `ink_darkness`
+ratios below 1 and `smooth_gradient_share` and `tone_count` ratios above 1.
+
+They are stored in the metrics record as `region_metrics` (`null` when the
+definition declares no regions, and absent in files written before v3):
+
+```
+region_metrics: { declared {size, boxes}, analysis_size {width, height},
+                  regions {<name>: {box, pixels, <measures>}},
+                  rest {pixels, <measures>}, ratios {<name>: {<measures>}} }
+```
+
+Try regions on a run without changing a definition and without storing
+anything:
+
+```
+python scripts/measure_run.py --benchmark B --run-id R --region head=480,80,800,400 --region-size 1280x704 --print-only
+```
+
+Limits:
+
+- The rectangles do not follow motion. They suit shots where the part stays
+  in place; for a moving head the region must be generous or the numbers mix
+  head and background.
+- They do not know what a face is. A region that is simply a different
+  material from the rest (sky, skin, a wall) differs too. Compare runs of the
+  same shot with the same regions; do not read one ratio in isolation.
+- Texture added on purpose (grain, halftone) counts as edges or as soft
+  shading. Compare raw runs with raw runs, variants with variants.
+- The three constants (1, 20, steps of 8) are first choices, not calibrated.
+  On real Wan output most pixels have a gradient above 1, so
+  `smooth_gradient_share` is high everywhere; the RATIO is the signal.
+- Post-processed variants are measured without regions for now
+  (`region_metrics: null`).
+
 ## Derived (post-processed) videos
 
 A styled variant of a run ([STYLE_LAYER.md](STYLE_LAYER.md)) is measured with
@@ -179,6 +243,7 @@ record in a raw run's place.
 
 - thresholds, pass/fail, any combined score
 - anything semantic: identity, line stability, style, artifacts
-- locating a defect in space (region) rather than only in time
+- locating a defect in space beyond the fixed, declared rectangles above
+  (no tracking, no detection)
 - use by the runner: metrics are computed after the run, by the CLI or on
   demand, never inside `BenchmarkRunner`

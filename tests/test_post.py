@@ -189,7 +189,7 @@ def test_irregular_holds_score_lower_than_mechanical_ones():
 
 
 def test_periodicity_is_part_of_the_metrics_and_bumps_the_version():
-    assert METRICS_VERSION == "2"
+    assert int(METRICS_VERSION) >= 2  # added in version 2; later versions keep it
     moving = scene(24)  # RGB stack, reduced to luma by the metrics
     assert compute_metrics(moving)["hold_pattern_periodicity"] is None  # no holds in a raw clip
     on_twos = timing.hold_frames(moving, 2)

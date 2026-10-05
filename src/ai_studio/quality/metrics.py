@@ -19,7 +19,11 @@ from typing import Any
 
 import numpy as np
 
-METRICS_VERSION = "2"  # 2: + hold_pattern_periodicity (all version-1 metrics unchanged)
+# 2: + hold_pattern_periodicity (all version-1 metrics unchanged)
+# 3: + region metrics (ai_studio.quality.regions), stored in the metrics record's
+#    region_metrics when the benchmark declares analysis regions; every
+#    version-2 metric is unchanged
+METRICS_VERSION = "3"
 
 DEFAULT_PULSE_PERIOD = 4
 HELD_FRAME_THRESHOLD = 0.3  # mean |diff| below this = the frame was held
