@@ -172,6 +172,39 @@ than 0.8 together with the LoRA.
 
 Each image took 31 to 33 s; peak VRAM 6.8 to 6.9 GB.
 
+### Grid: LoRA with a weaker IP-Adapter, and earlier LoRA files
+
+Same prompt, negative prompt and seed (42) as the validation above, LoRA
+strength 1.0, IP-Adapter "ease out". One image per cell, judged by eye.
+
+| Image | LoRA steps | IP-Adapter | Jacket colour | Watch | Chest logo | Pose / framing | Face against the reference |
+|---|---|---|---|---|---|---|---|
+| `..._lora600_ipa04.png` | 600 | 0.4 | dark charcoal | no | no | bench, three-quarter, head almost in profile; trousers olive | similar, hard to judge in profile |
+| `..._lora600_ipa05.png` | 600 | 0.5 | dark charcoal | no | yes | bench, body three-quarter, face towards the viewer | close |
+| `..._lora600_ipa06.png` | 600 | 0.6 | charcoal | no | yes | bench, nearly frontal | close |
+| `..._lora600_ipa08.png` (earlier) | 600 | 0.8 | olive-brown | no | no | frontal, tight, bench almost gone | closest |
+| `..._lora300_ipa04.png` | 300 | 0.4 | grey-green | no | no, but letter-like toggles at the collar | bench, three-quarter | similar |
+| `..._lora400_ipa04.png` | 400 | 0.4 | dark charcoal | no | no | bench, body three-quarter, face towards the viewer; trousers dark | close |
+| `..._lora500_ipa04.png` | 500 | 0.4 | charcoal | no | yes | bench, three-quarter, head almost in profile | similar |
+
+- IP-Adapter weight with the LoRA: 0.4 keeps the pose from the prompt; from
+  0.5 up the figure turns towards the camera and at 0.8 the bench is lost.
+  The face gets closer to the reference as the weight goes up. 0.4 was taken
+  for the second row of tries because it is the only weight with the asked
+  pose and without a logo.
+- LoRA file: no steady trend from 300 to 600 steps. The chest logo comes and
+  goes (500 and 600 at 0.5 / 0.6 have it, 400 and 600 at 0.4 do not), which
+  looks like chance between single images more than an effect of training
+  length.
+- The wristwatch is gone in every image with the LoRA.
+- The jacket is dark charcoal at best, never pure black.
+
+**Best of this grid: the 400-step LoRA with IP-Adapter 0.4** (dark jacket and
+trousers, no watch, no logo, asked pose, face turned to the viewer and close
+to the reference). The 600-step LoRA with 0.4 is second (olive trousers, face
+in profile). This rests on one seed per setting; a few seeds per setting are
+needed before calling either one the pipeline.
+
 ## Open, for a decision
 
 - Composition locking (the shot_04 start / end problem) is not shown to work.
