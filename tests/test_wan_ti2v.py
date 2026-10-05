@@ -539,6 +539,40 @@ def test_ffmpeg_failure_is_reported(tmp_path):
         encode_frames([np.zeros((32, 32, 3), dtype=np.uint8)], tmp_path / "missing_dir" / "out.mp4")
 
 
+class _FramesFromElsewhere:
+    """Five frames fetched one at a time, like the ComfyUI adapter's; the
+    fetch of frame `bad` fails with `error`, or the source just ends there."""
+
+    def __init__(self, bad, error=None):
+        self.bad, self.error = bad, error
+
+    def __len__(self):
+        return 5
+
+    def __getitem__(self, index):
+        if index == self.bad and self.error is not None:
+            raise self.error
+        return np.full((32, 32, 3), index * 40, dtype=np.uint8)
+
+    def __iter__(self):
+        stop = len(self) if self.error is not None else self.bad
+        return (self[index] for index in range(stop))
+
+
+@needs_ffmpeg
+@pytest.mark.parametrize("error", [ConnectionResetError("connection reset"), TimeoutError("timed out")])
+def test_a_frame_that_cannot_be_fetched_fails_the_encode(tmp_path, error):
+    # Both are OSError, like a closed ffmpeg pipe; they must not be taken for one.
+    with pytest.raises(type(error), match=str(error)):
+        encode_frames(_FramesFromElsewhere(bad=3, error=error), tmp_path / "out.mp4")
+
+
+@needs_ffmpeg
+def test_a_frame_source_that_ends_early_fails_the_encode(tmp_path):
+    with pytest.raises(RuntimeError, match="only 3 of 5 frames"):
+        encode_frames(_FramesFromElsewhere(bad=3), tmp_path / "out.mp4")
+
+
 # --- end to end through the real BenchmarkRunner ---
 
 DEFINITION = f"""\

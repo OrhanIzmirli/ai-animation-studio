@@ -53,14 +53,19 @@ def encode_frames(frames: Sequence[Any], output: str | Path, fps: int = DEFAULT_
         "-crf", str(settings["crf"]), "-preset", settings["preset"], "-r", str(fps), str(output),
     ]
     process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    written = 0
     try:
+        # An error from the frame source (a failed download, a truncated image)
+        # is not caught here: it must not look like "ffmpeg closed the pipe".
         for index, frame in enumerate(frames):
             data = first if index == 0 else frame_to_uint8(frame)
             if data.shape != first.shape:
                 raise ValueError(f"frame {index} has shape {data.shape}, expected {first.shape}")
-            process.stdin.write(data.tobytes())
-    except OSError:
-        pass  # ffmpeg exited early; its exit code and stderr are reported below
+            try:
+                process.stdin.write(data.tobytes())
+            except OSError:
+                break  # ffmpeg exited early; its exit code and stderr are reported below
+            written += 1
     except BaseException:
         process.kill()
         process.communicate()
@@ -68,6 +73,8 @@ def encode_frames(frames: Sequence[Any], output: str | Path, fps: int = DEFAULT_
     _, stderr = process.communicate()  # closes stdin, waits
     if process.returncode != 0:
         raise RuntimeError(f"ffmpeg failed ({process.returncode}): {stderr.decode(errors='replace').strip()}")
+    if written != len(frames):
+        raise RuntimeError(f"only {written} of {len(frames)} frames reached the encoder; {output} is incomplete")
     return settings
 
 
