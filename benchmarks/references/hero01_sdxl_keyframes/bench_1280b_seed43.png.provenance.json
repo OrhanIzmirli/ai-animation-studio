@@ -1,0 +1,61 @@
+{
+  "provenance_version": 1,
+  "asset_set": "hero01_sdxl_keyframes",
+  "file": "benchmarks/references/hero01_sdxl_keyframes/bench_1280b_seed43.png",
+  "sha256": "483d30e61bf86a853d14a7ee3d223943d6a64960c98dad10436fb54e8fc9ad3e",
+  "bytes": 1487551,
+  "width": 1280,
+  "height": 704,
+  "format": "PNG",
+  "original_filename": "sdxl_ipadapter_pipe_bench_1280b.png",
+  "origin": "generated on this machine by spikes/sdxl_ipadapter_spike.py (SDXL base + character LoRA + IP-Adapter in the local ComfyUI); not a benchmark run, not hand-made",
+  "generation": {
+    "checkpoint": "sd_xl_base_1.0.safetensors",
+    "ipadapter": "ip-adapter-plus_sdxl_vit-h.safetensors",
+    "clip_vision": "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
+    "weight_type": "ease out",
+    "images": [
+      {
+        "ipadapter_weight": 0.4,
+        "seconds": 31.6,
+        "result": "C:\\Users\\rhn23\\Desktop\\ai-animation-studio\\spikes\\output\\sdxl_ipadapter\\sdxl_ipadapter_pipe_bench_1280b.png",
+        "vram_peak_so_far_mib": 6783,
+        "ram_available_lowest_so_far_gb": 2.02
+      }
+    ],
+    "width": 1280,
+    "height": 704,
+    "steps": 25,
+    "cfg": 6.0,
+    "seed": 43,
+    "positive": "hero01, graphic novel illustration, one young man with short curly dark hair sitting alone on a park bench, three-quarter view, daylight, black hooded jacket with dark-red accents, black backpack with dark-red straps, dark cargo trousers, white low-top sneakers, calm expression, wide shot with the whole bench and trees around him, hand-inked contours, cel shading, halftone shading, (a single person:1.3)",
+    "negative": "photorealistic, 3d render, blurry, deformed hands, extra fingers, text, watermark, signature, no watch, no wristwatch, two people, second person, duplicate, twins, crowd",
+    "reference": "benchmarks\\references\\comic_hero_01\\character_turnaround_hero_01.jpg",
+    "init_image": null,
+    "denoise": 1.0,
+    "lora": "ai_studio_hero01_r8_600_steps_00501_.safetensors",
+    "lora_strength": 1.0,
+    "control": null,
+    "reference_crop_box": [
+      40,
+      46,
+      340,
+      346
+    ],
+    "reference_text_painted_over": [
+      238,
+      46,
+      340,
+      118
+    ],
+    "ram_available_before_gb": 9.77,
+    "vram_used_before_mib": 0,
+    "comfyui_started_by_spike": true,
+    "comfyui_startup_seconds": 12.7,
+    "custom_node_import_failed": false,
+    "vram_peak_mib": 6783,
+    "ram_available_lowest_gb": 2.02,
+    "comfyui_log": "C:\\Users\\rhn23\\AppData\\Local\\Temp\\ai_studio_comfyui_p4uoxaet.log"
+  },
+  "imported_at": "2026-10-06T00:47:54.834134+00:00"
+}
