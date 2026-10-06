@@ -1,5 +1,6 @@
 """Speak lines with Kokoro-82M. Run with the Python of the Kokoro environment
-(C:/Users/rhn23/ai-tools/kokoro-venv), not the project's:
+(by default ~/ai-tools/kokoro-venv; scripts/make_milo_audio.py reads the
+KOKORO_PYTHON environment variable), not the project's:
 
     kokoro-venv/Scripts/python.exe -I scripts/kokoro_tts.py OUT_DIR VOICE SPEED "line one" "line two" ...
 

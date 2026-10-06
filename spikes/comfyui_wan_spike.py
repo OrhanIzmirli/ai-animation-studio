@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -47,7 +48,7 @@ from ai_studio.benchmarking import load_definition  # noqa: E402
 from ai_studio.generation.backends.wan_ti2v import encode_frames, prepare_start_frame  # noqa: E402
 from ai_studio.quality.store import measure_video  # noqa: E402
 
-DEFAULT_COMFY = Path(r"C:\Users\rhn23\ai-tools\ComfyUI")
+DEFAULT_COMFY = Path(os.environ.get("COMFYUI_DIR", Path.home() / "ai-tools" / "ComfyUI"))
 DEFINITION = REPO / "benchmarks/definitions/comic_rooftop_01.yaml"
 SMOKE_METRICS = REPO / "benchmarks/metrics/comic_rooftop_01/20261004T145422Z-a264ad6e/metrics_v1.json"
 VARIANTS = {

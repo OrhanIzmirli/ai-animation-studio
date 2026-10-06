@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import wave
@@ -25,7 +26,8 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 RATE = 44100
-KOKORO_PY = Path("C:/Users/rhn23/ai-tools/kokoro-venv/Scripts/python.exe")
+# Python of the separate Kokoro environment (see scripts/kokoro_tts.py).
+KOKORO_PY = Path(os.environ.get("KOKORO_PYTHON", Path.home() / "ai-tools/kokoro-venv/Scripts/python.exe"))
 VOICE, SPEED = "am_michael", 0.92
 rng = np.random.default_rng(3)
 

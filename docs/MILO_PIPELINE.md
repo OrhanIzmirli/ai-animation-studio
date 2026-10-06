@@ -45,8 +45,8 @@ bacak/el çıktı, renk kaydı, hareket rastgeleydi; bu yüzden terk edildi.
 |---|---|
 | Makine | RTX 4060 Laptop 8 GB VRAM, 15.7 GB RAM, Windows 11 |
 | Proje ortamı | Python 3.11.9, `.venv` (numpy, Pillow, PyYAML, pytest); ffmpeg/ffprobe 8.1.2 |
-| ComfyUI | v0.38.2, `C:/Users/rhn23/ai-tools/ComfyUI` (kendi venv'i, torch cu128). HTTP API ile sürülür, arayüz kullanılmaz |
-| Kokoro ortamı | `C:/Users/rhn23/ai-tools/kokoro-venv` (Python 3.11, torch 2.14 CPU, kokoro 0.9.4, transformers 5.19). TTS ve derinlik tahmini burada çalışır |
+| ComfyUI | v0.38.2, `~/ai-tools/ComfyUI` (kendi venv'i, torch cu128). HTTP API ile sürülür, arayüz kullanılmaz |
+| Kokoro ortamı | `~/ai-tools/kokoro-venv` (yolu `KOKORO_PYTHON` ile değiştirilebilir) (Python 3.11, torch 2.14 CPU, kokoro 0.9.4, transformers 5.19). TTS ve derinlik tahmini burada çalışır |
 
 ## 3. Modeller
 
@@ -209,7 +209,7 @@ zamanları, müzik bölümleri, ortam sesi aralıkları (ses script'i okur).
 python scripts/make_keyframes.py --trailer milo_03
 python scripts/upscale_images.py --width 1920 --height 1056 --out outputs/hd_plates <5 arka plan>
 python scripts/upscale_images.py --width 2048 --height 2048 --out outputs/hd_plates benchmarks/references/milo/milo_cutout_v3.png
-C:/Users/rhn23/ai-tools/kokoro-venv/Scripts/python.exe -I scripts/depth_maps.py outputs/hd_plates/depth outputs/hd_plates/*_1920x1056.png
+~/ai-tools/kokoro-venv/Scripts/python.exe -I scripts/depth_maps.py outputs/hd_plates/depth outputs/hd_plates/*_1920x1056.png
 #   (+ milo_cutout_v3_2048_clean.png: büyütülmüş çizime orijinal maske uygulanır, bkz. §5)
 
 # film

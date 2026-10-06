@@ -33,7 +33,7 @@ the numbers say the pipeline works and how fast, not that the result is good.
 
 ## Software
 
-Installed outside the repository in `C:\Users\rhn23\ai-tools\ComfyUI`.
+Installed outside the repository in `~\ai-tools\ComfyUI`.
 
 | | |
 |---|---|
