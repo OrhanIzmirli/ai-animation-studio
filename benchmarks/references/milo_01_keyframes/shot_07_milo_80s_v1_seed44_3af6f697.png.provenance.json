@@ -1,0 +1,46 @@
+{
+  "provenance_version": 1,
+  "asset_set": "milo_01_keyframes",
+  "file": "benchmarks/references/milo_01_keyframes/shot_07_milo_80s_v1_seed44_3af6f697.png",
+  "sha256": "b989ce14932cfb4fd1a56bfce1b372f734938675121171736d3d3b343554f873",
+  "original_file": "outputs/keyframes/milo_01/shot_07_start/milo_80s_v1_seed44_3af6f697.png",
+  "origin": "generated on this machine by scripts/make_keyframes.py under a style lock",
+  "keyframe_record": {
+    "keyframe_version": 1,
+    "trailer_id": "milo_01",
+    "request": {
+      "lock_id": "milo_80s_v1",
+      "keyframe_id": "shot_07_start",
+      "positive": "style of 80scartoon, An adorable classic 1980s cartoon style friendly ghost named Milo, translucent pale blue-white body, humanoid ghost anatomy, distinct cute face with large expressive turquoise eyes, small friendly smile, distinct floating arms and little hands, his body tapers down into a soft floating wispy ghost tail instead of legs, full body silhouette, gently reaching out his little hand toward a small kitten, thick black ink outlines, flat cel-shaded colors, inside a moonlit castle room, moonlight through a tall window, stone walls, a tiny frightened grey kitten crouching in the corner, no text or watermarks",
+      "negative": "photorealistic, 3d render, blurry, deformed hands, extra fingers, text, watermark, signature, ugly, creepy, scary, skeleton, zombie, distorted face, monster teeth, wrinkles, veins, aggressive expression, evil, sheet, clothing, dress, cloth, hood, bow, blob creature, slime, ball shape, round circle body, legs, feet, sharp teeth, modern anime, vector, two ghosts, duplicate, twin",
+      "width": 1280,
+      "height": 704,
+      "seed": 44,
+      "reference_image": null
+    },
+    "key": "3af6f697",
+    "lock": {
+      "lock_id": "milo_80s_v1",
+      "steps": 25,
+      "cfg": 6.0,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras",
+      "loras": [
+        {
+          "file": "civitai_80scartoon_sdxl.safetensors",
+          "sha256": "6a7d2e248256d66524571fc1f2757fab5fe6b315fb78ed718a269c223ed87c64",
+          "strength": 1.0
+        }
+      ],
+      "ipadapter": null
+    },
+    "model_sha256": {
+      "sd_xl_base_1.0.safetensors": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b",
+      "civitai_80scartoon_sdxl.safetensors": "6a7d2e248256d66524571fc1f2757fab5fe6b315fb78ed718a269c223ed87c64"
+    },
+    "png_sha256": "b989ce14932cfb4fd1a56bfce1b372f734938675121171736d3d3b343554f873",
+    "seconds": 15.2,
+    "made_at": "2026-10-06T19:21:20+0200"
+  },
+  "imported_at": "2026-10-06T17:41:49.778487+00:00"
+}

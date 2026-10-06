@@ -1,0 +1,71 @@
+{
+  "benchmark_id": "milo_01_shot_07",
+  "run_id": "20261006T174149Z-abdb128f",
+  "task_type": "video_generation",
+  "task_parameters": {
+    "duration_seconds": 5.0,
+    "requested_fps": 24,
+    "duration_tolerance_seconds": null,
+    "camera_motion": "static medium shot, moonlit room",
+    "subject_motion": [
+      "Milo reaches out his little hand to a frightened kitten in the corner",
+      "the kitten rubs against his hand",
+      "Milo looks at the camera and winks"
+    ],
+    "visual_direction": null,
+    "run_purpose": "experiment"
+  },
+  "status": "failed",
+  "failure_stage": "abandoned",
+  "error_type": "AbandonedRun",
+  "error_message": "the run started generating but never finished: no record was saved (process killed, crash or power loss)",
+  "backend": "wan-ti2v-5b-turbo-comfyui",
+  "backend_version": "comfyui-0.1",
+  "model": "Wan2.2-TI2V-5B-Turbo (quanhaol) GGUF Q8_0",
+  "model_version": "b4d7d1888d5ec2c29046cc443239faad99614cd3d356c61d8192fcac5f4c98fc",
+  "workflow_version": "i2v-turbo-tiled-v1",
+  "seed": 42,
+  "inference_steps": null,
+  "guidance": null,
+  "model_parameters": {},
+  "prompt": "1980s cartoon cel animation. Inside a moonlit castle room, a cute pale blue-white ghost slowly reaches out his little hand toward a small frightened kitten crouching in the corner. The kitten rubs against his hand; the ghost looks at the camera and winks. Moonlight through a tall window, stone walls. Painted background, film grain.",
+  "negative_prompt": "photorealistic, 3d render, scary, legs, feet, text, watermark",
+  "source_video": null,
+  "reference_assets": [],
+  "input_checksums": {
+    "benchmarks/references/milo_01_keyframes/shot_07_milo_80s_v1_seed44_3af6f697.png": "b989ce14932cfb4fd1a56bfce1b372f734938675121171736d3d3b343554f873"
+  },
+  "start_frame": {
+    "path": "benchmarks/references/milo_01_keyframes/shot_07_milo_80s_v1_seed44_3af6f697.png",
+    "sha256": "b989ce14932cfb4fd1a56bfce1b372f734938675121171736d3d3b343554f873",
+    "original_width": 1280,
+    "original_height": 704,
+    "preprocessing": null,
+    "effective_width": null,
+    "effective_height": null,
+    "derived_file": null
+  },
+  "output_video": null,
+  "resolution": {
+    "width": 1280,
+    "height": 704
+  },
+  "fps": null,
+  "frame_count": null,
+  "output_media": null,
+  "image_output": null,
+  "gpu": null,
+  "vram_gb": null,
+  "validation_time_seconds": 0.0013541999978770036,
+  "prepare_time_seconds": 28.332750500001566,
+  "generation_time_seconds": null,
+  "verification_time_seconds": null,
+  "total_time_seconds": null,
+  "estimated_cost_usd": null,
+  "environment": {},
+  "quality_metrics": {},
+  "human_rating": null,
+  "notes": "trailer milo_01, shot_07 (The kitten); keyframe benchmarks/references/milo_01_keyframes/shot_07_milo_80s_v1_seed44_3af6f697.png\nabandoned: generation started 2026-10-06T17:42:18.118055+00:00 (pid 14408 on MsıOrhan) and no record was saved; recorded as failed on 2026-10-06T17:45:22.434322+00:00",
+  "timestamp": "2026-10-06T17:42:18.118055+00:00",
+  "schema_version": 10
+}

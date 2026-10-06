@@ -1,0 +1,134 @@
+# MILO - 15-second teaser, 5 shots. Made 2026-10-06 after trailer milo_01.
+#
+# Lessons from milo_01, applied here:
+#   - only Milo and places in frame: SDXL could not draw a second figure or
+#     prop (kitten, shadow hand, castle window) together with him;
+#   - every Milo keyframe from lock milo_80s_v3 (cut-out reference, limited to
+#     a region) and seed 43, the combination that kept him the same;
+#   - short clips (2-4 s), small motions, static camera: drift and morphing
+#     grew with length and with big motions;
+#   - every clip is checked (scripts/check_clip.py, plus a look at its
+#     frames) and remade with another seed when it fails;
+#   - dips to black between shots instead of hard cuts.
+#
+# Narration and music: notes, made by scripts/make_teaser_audio.py.
+
+trailer_id: milo_02
+working_title: "MILO"
+status: draft
+fps: 24
+resolution: {width: 1280, height: 704}
+total_duration_seconds: 15
+
+# The LoRA already gives the cel-and-film look; retro_cel_v3 is the closest
+# finish and the one milo_01 used, so the two can be compared.
+artist_profile: retro_cel_v3
+
+character: MILO
+
+shots:
+  - id: shot_01
+    name: The forest under the moon
+    source: generated
+    duration_seconds: 3
+    needs_character_keyframe: false
+    status: draft
+    camera: static wide shot
+    motion:
+      - the bare branches sway slightly in the wind
+    prompt: >-
+      1980s hand-painted cartoon background, night. A full moon above a gloomy
+      forest of old leafless trees. Only the bare branches sway slightly in
+      the wind; nothing else moves or appears. Static camera, steady colours,
+      no flicker. Film grain.
+    negative_prompt: photorealistic, 3d render, text, watermark, characters
+    fade_in_seconds: 0.5
+    fade_out_seconds: 0.25
+    clip: {run: milo_02_shot_01/20261006T182811Z-e89c5824}
+    notes: |
+      Mist was dropped from the prompt: Wan drew it as pink blobs that grew
+      out of the ground (runs 7d71bbe1, bd098df7).
+      Narration: "Deep in the shadowy forest..."
+      Music: low, mysterious analog synth.
+
+  - id: shot_02
+    name: Milo appears
+    source: generated
+    duration_seconds: 3
+    needs_character_keyframe: true
+    status: draft
+    camera: static medium shot
+    motion:
+      - Milo floats gently in place and smiles
+    prompt: >-
+      1980s cartoon cel animation. A cute pale blue-white cartoon ghost with no
+      legs floats gently in place in front of an old tree at night, smiling,
+      bobbing slightly up and down. His shape stays the same. Static camera.
+      Painted background, film grain.
+    negative_prompt: photorealistic, 3d render, text, watermark
+    fade_in_seconds: 0.25
+    fade_out_seconds: 0.25
+    clip: {run: milo_02_shot_02/20261006T183143Z-d243e9cb}
+    notes: |
+      Narration: "...lives a ghost who isn't scary at all."
+      Music: turns soft and magical (bells).
+
+  - id: shot_03
+    name: Milo flies
+    source: generated
+    duration_seconds: 4
+    needs_character_keyframe: true
+    status: draft
+    camera: static wide shot of the night sky
+    motion:
+      - Milo floats happily in the starry sky, arms open, drifting slightly
+    prompt: >-
+      1980s cartoon cel animation. A cute pale blue-white cartoon ghost floats
+      happily in a starry night sky above pink and purple clouds, arms open
+      wide, drifting slowly and gently. His shape stays the same. Static
+      camera. Painted background, film grain.
+    negative_prompt: photorealistic, 3d render, text, watermark
+    fade_in_seconds: 0.25
+    fade_out_seconds: 0.25
+    clip: {run: milo_02_shot_03/20261006T184214Z-73a789c5}
+    notes: |
+      The owner's favourite keyframe (milo_01 shot_04_start, lock v3, seed 43).
+      Narration: "Meet Milo!"
+
+  - id: shot_04
+    name: Milo waves
+    source: generated
+    duration_seconds: 2
+    needs_character_keyframe: true
+    status: draft
+    camera: static medium shot
+    motion:
+      - Milo waves both hands happily
+    prompt: >-
+      1980s cartoon cel animation. A cute pale blue-white cartoon ghost waves
+      both little hands happily at the viewer in a forest clearing at night.
+      Small gentle movement, his shape stays the same. Static camera. Painted
+      background, film grain.
+    negative_prompt: photorealistic, 3d render, text, watermark
+    fade_in_seconds: 0.25
+    clip: {run: milo_02_shot_04/20261006T184559Z-19971dd0}
+
+  - id: shot_05
+    name: Title
+    source: title_card
+    duration_seconds: 3
+    needs_character_keyframe: false
+    status: draft
+    camera: static
+    motion: []
+    prompt: null
+    negative_prompt: null
+    title_card:
+      text: MILO
+      subtitle: Coming this Saturday Morning
+      image: outputs/title_cards/milo_02_title.png   # scripts/make_title_card.py on keyframe shot_05_plate
+    fade_in_seconds: 0.25
+    fade_out_seconds: 0.75
+    clip: null
+    notes: |
+      Narration: "Milo... coming soon!"

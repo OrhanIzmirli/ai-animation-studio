@@ -1,0 +1,111 @@
+# Keyframes for trailer milo_01: the start frame of every generated shot
+# (the video model animates from it), plus the title card's background plate.
+#
+#   python scripts/make_keyframes.py --trailer milo_01 --dry-run   (prompts only)
+#   python scripts/make_keyframes.py --trailer milo_01             (every keyframe, every seed)
+#   python scripts/make_keyframes.py --trailer milo_01 --keyframe shot_03_start --seed 42
+#
+# The look is the style lock's and only the lock's: a keyframe adds a pose
+# and a scene, never style words. Prompt = trigger, [character name, solo,
+# body], [pose], style, scene, tail (see the lock file).
+#
+# Fields per keyframe:
+#   id                 unique; <shot>_start for a shot's start frame
+#   shot               the shot it belongs to (shotlist.yaml)
+#   character          a character of the lock (milo) or null for no character
+#   solo               add the lock's "single, alone" words (default true; false
+#                      when another figure is in the picture)
+#   character_reference  also condition on the character's reference image
+#                      through the IP-Adapter (default false)
+#   character_region   [x0, y0, x1, y1], fractions of the frame: the reference
+#                      acts only there (default: the whole frame, which repaints
+#                      the scene in the reference's colours)
+#   pose               what the character does (character keyframes only)
+#   scene              place, light, framing
+#   negative           extra negative words for this keyframe (optional)
+#   seeds              overrides the default seeds (optional)
+
+trailer_id: milo_01
+style_lock: milo_80s_v3    # v1: no character reference; v2: reference with background (copied the scene)
+resolution: {width: 1280, height: 704}   # the video model's native size
+seeds: [42, 43, 44, 45]
+
+keyframes:
+  - id: shot_01_start
+    shot: shot_01
+    character: null
+    scene: >-
+      a huge full moon in a dark teal night sky above a gloomy forest of old
+      leafless gnarled trees with hollow trunks, drifting mist between the
+      trunks, wide establishing shot, hand-painted background, warm moonlight,
+      muted deep blue and teal palette, film grain
+    negative: ghost, character, person, animal
+
+  - id: shot_02_start
+    shot: shot_02
+    character: null
+    scene: >-
+      close view of the dark hollow in the trunk of a huge old tree at night,
+      deep inside the black hollow two large round glowing turquoise eyes,
+      friendly and curious, nothing else of the creature visible, moonlight on
+      the rough bark, hand-painted background, film grain
+    negative: body, full figure, mouth, teeth, monster
+
+  - id: shot_03_start
+    shot: shot_03
+    character: milo
+    character_reference: true
+    character_region: [0.35, 0.10, 0.65, 0.95]   # centre, in front of the hollow
+    pose: >-
+      floating out of the hollow of a huge old tree, arms open wide, happy
+      smile, his body glowing softly
+    scene: spooky forest at night, full moon, dead trees, dark hollow-tree background
+
+  - id: shot_04_start
+    shot: shot_04
+    character: milo
+    character_reference: true
+    character_region: [0.33, 0.10, 0.67, 0.90]   # centre of the sky
+    pose: flying joyfully through the air, arms stretched forward, gleeful smile
+    scene: night sky above a dark forest, full moon behind him, drifting clouds
+
+  - id: shot_05_start
+    shot: shot_05
+    character: milo
+    character_reference: true
+    character_region: [0.12, 0.15, 0.48, 0.95]   # left; the shadow hand comes from the right
+    pose: floating in the foreground, looking back over his shoulder in surprise, eyes wide
+    scene: >-
+      dark forest at night, behind him a huge black shadow hand with long
+      fingers reaching out of the darkness toward him
+
+  - id: shot_06_start
+    shot: shot_06
+    character: milo
+    character_reference: true
+    character_region: [0.42, 0.35, 0.58, 0.75]   # small, at the window
+    pose: small in the middle distance, flying toward a broken window
+    scene: >-
+      an old ruined castle at night under the full moon, a broken window in
+      the stone wall, dark trees around, wide shot
+
+  - id: shot_07_start
+    shot: shot_07
+    character: milo
+    character_reference: true
+    character_region: [0.10, 0.15, 0.45, 0.95]   # left; the kitten is in the right corner
+    solo: false
+    pose: gently reaching out his little hand toward a small kitten
+    scene: >-
+      inside a moonlit castle room, moonlight through a tall window, stone
+      walls, a tiny frightened grey kitten crouching in the corner
+    negative: two ghosts, duplicate, twin
+
+  - id: shot_08_plate
+    shot: shot_08
+    character: null
+    scene: >-
+      dark night sky with a full moon above the silhouette of an old castle
+      and a forest, large empty dark area in the middle of the picture, hand-painted
+      background, film grain
+    negative: ghost, character, person, letters

@@ -1,0 +1,41 @@
+{
+  "provenance_version": 1,
+  "asset_set": "milo",
+  "file": "benchmarks/references/milo/milo_cutout_v3.png",
+  "sha256": "111ed435cb946cb12b5d5b9a3112c682a96f3f498ea967aa2eb1003714281f7a",
+  "bytes": 358458,
+  "width": 1024,
+  "height": 1024,
+  "format": "PNG",
+  "original_filename": "milo_cutout_v3.png",
+  "origin": "made by hand in an external tool and imported; not produced by a backend of this project",
+  "stated_by_user": {
+    "tool": "spikes/cutout_milo.py (deterministic numpy cutout, no model)",
+    "model": "none: milo_design_v2.png, the figure cut out onto plain grey (128), centred, 1024x1024",
+    "made_on": "2026-10-06",
+    "input_references": [
+      {
+        "path": "benchmarks/references/milo/milo_design_v2.png",
+        "sha256": "60cced87b1a490f06a759400b702a1e58ba8af59eba0951d2ea59d4f9dbd20e4"
+      }
+    ],
+    "notes": "IP-Adapter reference: with the forest behind him, the v2 reference copied the forest and the pose into every keyframe."
+  },
+  "prompt": "(no prompt: cut out programmatically from benchmarks/references/milo/milo_design_v2.png)",
+  "prompt_source": "argument",
+  "prompt_sha256": "8a700f0a0d5c1ff231c1627c124b11a010c9eeb82f62f4f509da561cb0ff6bf6",
+  "source_file_modified": "2026-10-06T18:04:43.169019+00:00",
+  "imported_at": "2026-10-06T18:05:01.368701+00:00",
+  "visible_watermark_check": {
+    "method": "compact near-neutral shape that stands apart from its corner (heuristic, report only)",
+    "version": "1",
+    "corner_side": 143,
+    "corners": {
+      "top_left": null,
+      "top_right": null,
+      "bottom_left": null,
+      "bottom_right": null
+    },
+    "flagged": []
+  }
+}

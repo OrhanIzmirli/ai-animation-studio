@@ -1,0 +1,36 @@
+{
+  "provenance_version": 1,
+  "asset_set": "milo",
+  "file": "benchmarks/references/milo/milo_final_design.png",
+  "sha256": "19b447937bf00c84d5b024157d75aa4d6c8cb53998f3efed2bebb9a04b82c683",
+  "bytes": 1413396,
+  "width": 1024,
+  "height": 1024,
+  "format": "PNG",
+  "original_filename": "sdxl_ipadapter_milo_80s_ghost_seed42.png",
+  "origin": "made by hand in an external tool and imported; not produced by a backend of this project",
+  "stated_by_user": {
+    "tool": "local ComfyUI v0.38.2 via spikes/sdxl_ipadapter_spike.py",
+    "model": "SDXL base 1.0 + Civitai '80s cartoon SDXL 1.0' LoRA (model 125857, sha256 6a7d2e24...) at 1.0; seed 42, 1024x1024, 25 steps, CFG 6, dpmpp_2m/karras",
+    "made_on": "2026-10-06",
+    "input_references": [],
+    "notes": "Approved by the owner as Milo's design. Negative prompt and all settings: spikes/output/sdxl_ipadapter/report_milo_80s_ghost_seed42.json."
+  },
+  "prompt": "style of 80scartoon, An adorable classic 1980s cartoon style friendly ghost named Milo, a single ghost, alone, translucent pale blue-white body, humanoid ghost anatomy, distinct cute face with large expressive turquoise eyes, small friendly smile, distinct floating arms and little hands, his body tapers down into a soft floating wispy ghost tail instead of legs, full body silhouette, thick black ink outlines, flat cel-shaded colors, spooky forest at night, dead trees, dark hollow-tree background, no text or watermarks",
+  "prompt_source": "file milo_prompt.txt",
+  "prompt_sha256": "6f527b675c7669f2fb400fee6f686657d210ba51746bc76741759a1279e431e5",
+  "source_file_modified": "2026-10-06T17:01:18.060743+00:00",
+  "imported_at": "2026-10-06T17:06:53.706758+00:00",
+  "visible_watermark_check": {
+    "method": "compact near-neutral shape that stands apart from its corner (heuristic, report only)",
+    "version": "1",
+    "corner_side": 143,
+    "corners": {
+      "top_left": null,
+      "top_right": null,
+      "bottom_left": null,
+      "bottom_right": null
+    },
+    "flagged": []
+  }
+}

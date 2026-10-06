@@ -1,0 +1,41 @@
+{
+  "provenance_version": 1,
+  "asset_set": "milo",
+  "file": "benchmarks/references/milo/milo_design_v2.png",
+  "sha256": "60cced87b1a490f06a759400b702a1e58ba8af59eba0951d2ea59d4f9dbd20e4",
+  "bytes": 1393115,
+  "width": 1024,
+  "height": 1024,
+  "format": "PNG",
+  "original_filename": "milo_design_v2.png",
+  "origin": "made by hand in an external tool and imported; not produced by a backend of this project",
+  "stated_by_user": {
+    "tool": "spikes/paint_milo_eyes.py (deterministic numpy paint, no model)",
+    "model": "none: milo_final_design.png with turquoise irises, black pupils and white glints painted inside the original eye shapes",
+    "made_on": "2026-10-06",
+    "input_references": [
+      {
+        "path": "benchmarks/references/milo/milo_final_design.png",
+        "sha256": "19b447937bf00c84d5b024157d75aa4d6c8cb53998f3efed2bebb9a04b82c683"
+      }
+    ],
+    "notes": "Owner asked for turquoise eyes; the eye shapes and everything else are unchanged."
+  },
+  "prompt": "(no prompt: painted programmatically from benchmarks/references/milo/milo_final_design.png)",
+  "prompt_source": "argument",
+  "prompt_sha256": "b9e0e785b1fa334251c025d7eaeba4291ee63609349914076d67d6717df26ff1",
+  "source_file_modified": "2026-10-06T17:59:18.939342+00:00",
+  "imported_at": "2026-10-06T17:59:37.706806+00:00",
+  "visible_watermark_check": {
+    "method": "compact near-neutral shape that stands apart from its corner (heuristic, report only)",
+    "version": "1",
+    "corner_side": 143,
+    "corners": {
+      "top_left": null,
+      "top_right": null,
+      "bottom_left": null,
+      "bottom_right": null
+    },
+    "flagged": []
+  }
+}

@@ -1,0 +1,62 @@
+# Keyframes for the milo_02 teaser. Same lock as milo_01's last keyframes
+# (milo_80s_v3: cut-out character reference, limited to a region) and seed 43
+# for every Milo keyframe, the combination that kept him the same character.
+# Field reference: trailers/milo_01/keyframes.yaml.
+
+trailer_id: milo_02
+style_lock: milo_80s_v3
+resolution: {width: 1280, height: 704}
+seeds: [43]
+
+keyframes:
+  - id: shot_01_start
+    shot: shot_01
+    character: null
+    scene: >-
+      a huge full moon in a dark teal night sky above a gloomy forest of old
+      leafless gnarled trees with hollow trunks, drifting mist between the
+      trunks, wide establishing shot, hand-painted background, warm moonlight,
+      muted deep blue and teal palette, film grain
+    negative: ghost, character, person, animal
+    seeds: [42, 45]
+
+  - id: shot_02_start
+    shot: shot_02
+    character: milo
+    character_reference: true
+    character_region: [0.35, 0.10, 0.65, 0.95]
+    pose: >-
+      floating out of the hollow of a huge old tree, arms open wide, happy
+      smile, his body glowing softly
+    scene: spooky forest at night, full moon, dead trees, dark hollow-tree background
+
+  # The owner's favourite: identical request to milo_01 shot_04_start, seed 43.
+  - id: shot_03_start
+    shot: shot_03
+    character: milo
+    character_reference: true
+    character_region: [0.33, 0.10, 0.67, 0.90]
+    pose: flying joyfully through the air, arms stretched forward, gleeful smile
+    scene: night sky above a dark forest, full moon behind him, drifting clouds
+
+  # Identical request to milo_01 shot_05_start, seed 43: the scene text asks for
+  # a shadow hand, but the picture is Milo waving in a forest clearing.
+  - id: shot_04_start
+    shot: shot_04
+    character: milo
+    character_reference: true
+    character_region: [0.12, 0.15, 0.48, 0.95]
+    pose: floating in the foreground, looking back over his shoulder in surprise, eyes wide
+    scene: >-
+      dark forest at night, behind him a huge black shadow hand with long
+      fingers reaching out of the darkness toward him
+
+  - id: shot_05_plate
+    shot: shot_05
+    character: null
+    scene: >-
+      dark night sky with a full moon above the silhouette of an old castle
+      and a forest, large empty dark area in the middle of the picture, hand-painted
+      background, film grain
+    negative: ghost, character, person, letters
+    seeds: [42]

@@ -1,0 +1,82 @@
+# Style lock: the look of Milo's approved design (seed 42), frozen.
+#
+# Everything here was used, unchanged, for
+#   benchmarks/references/milo/milo_final_design.png
+# (spikes/output/sdxl_ipadapter/report_milo_80s_ghost_seed42.json). With the
+# "milo" character, the "design_check" scene below and seed 42 at 1024x1024,
+# the keyframe tool must reproduce that picture pixel for pixel; that is how
+# this lock is checked (scripts/make_keyframes.py --check-lock). Pixels, not
+# file bytes: ComfyUI writes the workflow into the PNG's metadata.
+#
+# A lock is immutable once keyframes were made with it. To change anything,
+# copy this file to milo_80s_v2.yaml.
+#
+# Prompt order (fixed): trigger, character name, [solo], character body,
+# [pose], style, scene, tail; joined with ", ". Negative: base, [solo],
+# character, shot extras.
+
+lock_id: milo_80s_v1
+
+checkpoint:
+  file: sd_xl_base_1.0.safetensors                 # <ComfyUI>/models/checkpoints/
+  sha256: 31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b
+loras:
+  - file: civitai_80scartoon_sdxl.safetensors      # <ComfyUI>/models/loras/
+    sha256: 6a7d2e248256d66524571fc1f2757fab5fe6b315fb78ed718a269c223ed87c64
+    strength: 1.0
+    source: https://civitai.com/models/125857 ("80s cartoon SDXL 1.0", version 137526)
+
+# Used only when a keyframe asks for character_reference.
+ipadapter:
+  file: ip-adapter-plus_sdxl_vit-h.safetensors      # <ComfyUI>/models/ipadapter/
+  sha256: 3f5062b8400c94b7159665b21ba5c62acdcd7682262743d7f2aefedef00e6581
+  clip_vision: CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors   # <ComfyUI>/models/clip_vision/
+  clip_vision_sha256: 6ca9667da1ca9e0b0f75e46bb030f7e011f44f86cbfb8d5a36590fcd7507b030
+  weight: 0.4
+  weight_type: ease out                              # "prompt is more important"
+
+sampler:
+  steps: 25
+  cfg: 6.0
+  sampler: dpmpp_2m
+  scheduler: karras
+
+trigger: style of 80scartoon
+style: thick black ink outlines, flat cel-shaded colors
+tail: no text or watermarks
+
+negative: >-
+  photorealistic, 3d render, blurry, deformed hands, extra fingers, text,
+  watermark, signature, ugly, creepy, scary, skeleton, zombie, distorted face,
+  monster teeth, wrinkles, veins, aggressive expression, evil, sheet, clothing,
+  dress, cloth, hood, bow
+
+characters:
+  milo:
+    name: An adorable classic 1980s cartoon style friendly ghost named Milo
+    solo: a single ghost, alone
+    solo_negative: two ghosts, duplicate, twin
+    body: >-
+      translucent pale blue-white body, humanoid ghost anatomy,
+      distinct cute face with large expressive turquoise eyes, small
+      friendly smile, distinct floating arms and little hands, his body tapers
+      down into a soft floating wispy ghost tail instead of legs, full body
+      silhouette
+    negative: >-
+      blob creature, slime, ball shape, round circle body, legs, feet, sharp
+      teeth, modern anime, vector
+    # Optional identity reference through the IP-Adapter (a shot turns it on
+    # with character_reference). Not used for the approved design itself.
+    reference_image: benchmarks/references/milo/milo_final_design.png
+    reference_sha256: 19b447937bf00c84d5b024157d75aa4d6c8cb53998f3efed2bebb9a04b82c683
+
+# The scene of the approved design: used only to check the lock.
+design_check:
+  character: milo
+  solo: true
+  scene: spooky forest at night, dead trees, dark hollow-tree background
+  seed: 42
+  width: 1024
+  height: 1024
+  expected_image: benchmarks/references/milo/milo_final_design.png
+  expected_sha256: 19b447937bf00c84d5b024157d75aa4d6c8cb53998f3efed2bebb9a04b82c683   # of that file

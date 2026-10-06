@@ -1,0 +1,61 @@
+{
+  "provenance_version": 1,
+  "asset_set": "milo_02_keyframes",
+  "file": "benchmarks/references/milo_02_keyframes/shot_03_milo_80s_v3_seed43_3a678874.png",
+  "sha256": "efe2aef18537ed0e2ca975398fb034bb3682d56e6b7be9ed89857e36d392c2b1",
+  "original_file": "outputs/keyframes/milo_02/shot_03_start/milo_80s_v3_seed43_3a678874.png",
+  "origin": "generated on this machine by scripts/make_keyframes.py under a style lock",
+  "keyframe_record": {
+    "keyframe_version": 1,
+    "trailer_id": "milo_02",
+    "request": {
+      "lock_id": "milo_80s_v3",
+      "keyframe_id": "shot_03_start",
+      "positive": "style of 80scartoon, An adorable classic 1980s cartoon style friendly ghost named Milo, a single ghost, alone, translucent pale blue-white body, humanoid ghost anatomy, distinct cute face with large expressive turquoise eyes, small friendly smile, distinct floating arms and little hands, his body tapers down into a soft floating wispy ghost tail instead of legs, full body silhouette, flying joyfully through the air, arms stretched forward, gleeful smile, thick black ink outlines, flat cel-shaded colors, night sky above a dark forest, full moon behind him, drifting clouds, no text or watermarks",
+      "negative": "photorealistic, 3d render, blurry, deformed hands, extra fingers, text, watermark, signature, ugly, creepy, scary, skeleton, zombie, distorted face, monster teeth, wrinkles, veins, aggressive expression, evil, sheet, clothing, dress, cloth, hood, bow, two ghosts, duplicate, twin, blob creature, slime, ball shape, round circle body, legs, feet, sharp teeth, modern anime, vector",
+      "width": 1280,
+      "height": 704,
+      "seed": 43,
+      "reference_image": "benchmarks/references/milo/milo_cutout_v3.png",
+      "reference_region": [
+        0.33,
+        0.1,
+        0.67,
+        0.9
+      ]
+    },
+    "key": "3a678874",
+    "lock": {
+      "lock_id": "milo_80s_v3",
+      "steps": 25,
+      "cfg": 6.0,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras",
+      "loras": [
+        {
+          "file": "civitai_80scartoon_sdxl.safetensors",
+          "sha256": "6a7d2e248256d66524571fc1f2757fab5fe6b315fb78ed718a269c223ed87c64",
+          "strength": 1.0
+        }
+      ],
+      "ipadapter": {
+        "file": "ip-adapter-plus_sdxl_vit-h.safetensors",
+        "sha256": "3f5062b8400c94b7159665b21ba5c62acdcd7682262743d7f2aefedef00e6581",
+        "clip_vision": "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors",
+        "clip_vision_sha256": "6ca9667da1ca9e0b0f75e46bb030f7e011f44f86cbfb8d5a36590fcd7507b030",
+        "weight": 0.5,
+        "weight_type": "ease out"
+      }
+    },
+    "model_sha256": {
+      "sd_xl_base_1.0.safetensors": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b",
+      "civitai_80scartoon_sdxl.safetensors": "6a7d2e248256d66524571fc1f2757fab5fe6b315fb78ed718a269c223ed87c64",
+      "ip-adapter-plus_sdxl_vit-h.safetensors": "3f5062b8400c94b7159665b21ba5c62acdcd7682262743d7f2aefedef00e6581",
+      "CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors": "6ca9667da1ca9e0b0f75e46bb030f7e011f44f86cbfb8d5a36590fcd7507b030"
+    },
+    "png_sha256": "efe2aef18537ed0e2ca975398fb034bb3682d56e6b7be9ed89857e36d392c2b1",
+    "seconds": 23.5,
+    "made_at": "2026-10-06T20:20:27+0200"
+  },
+  "imported_at": "2026-10-06T18:34:44.593373+00:00"
+}

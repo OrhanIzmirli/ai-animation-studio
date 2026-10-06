@@ -1,0 +1,46 @@
+{
+  "provenance_version": 1,
+  "asset_set": "milo_01_keyframes",
+  "file": "benchmarks/references/milo_01_keyframes/shot_02_milo_80s_v1_seed45_bad58716.png",
+  "sha256": "16c734fb4372c46fcc76938a3baadedf67b0bf02f6ce81c59b0be90441af55be",
+  "original_file": "outputs/keyframes/milo_01/shot_02_start/milo_80s_v1_seed45_bad58716.png",
+  "origin": "generated on this machine by scripts/make_keyframes.py under a style lock",
+  "keyframe_record": {
+    "keyframe_version": 1,
+    "trailer_id": "milo_01",
+    "request": {
+      "lock_id": "milo_80s_v1",
+      "keyframe_id": "shot_02_start",
+      "positive": "style of 80scartoon, thick black ink outlines, flat cel-shaded colors, close view of the dark hollow in the trunk of a huge old tree at night, deep inside the black hollow two large round glowing turquoise eyes, friendly and curious, nothing else of the creature visible, moonlight on the rough bark, hand-painted background, film grain, no text or watermarks",
+      "negative": "photorealistic, 3d render, blurry, deformed hands, extra fingers, text, watermark, signature, ugly, creepy, scary, skeleton, zombie, distorted face, monster teeth, wrinkles, veins, aggressive expression, evil, sheet, clothing, dress, cloth, hood, bow, body, full figure, mouth, teeth, monster",
+      "width": 1280,
+      "height": 704,
+      "seed": 45,
+      "reference_image": null
+    },
+    "key": "bad58716",
+    "lock": {
+      "lock_id": "milo_80s_v1",
+      "steps": 25,
+      "cfg": 6.0,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras",
+      "loras": [
+        {
+          "file": "civitai_80scartoon_sdxl.safetensors",
+          "sha256": "6a7d2e248256d66524571fc1f2757fab5fe6b315fb78ed718a269c223ed87c64",
+          "strength": 1.0
+        }
+      ],
+      "ipadapter": null
+    },
+    "model_sha256": {
+      "sd_xl_base_1.0.safetensors": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b",
+      "civitai_80scartoon_sdxl.safetensors": "6a7d2e248256d66524571fc1f2757fab5fe6b315fb78ed718a269c223ed87c64"
+    },
+    "png_sha256": "16c734fb4372c46fcc76938a3baadedf67b0bf02f6ce81c59b0be90441af55be",
+    "seconds": 15.2,
+    "made_at": "2026-10-06T19:16:33+0200"
+  },
+  "imported_at": "2026-10-06T17:27:30.868554+00:00"
+}

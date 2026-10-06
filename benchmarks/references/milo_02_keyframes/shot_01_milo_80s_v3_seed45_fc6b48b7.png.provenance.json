@@ -1,0 +1,47 @@
+{
+  "provenance_version": 1,
+  "asset_set": "milo_02_keyframes",
+  "file": "benchmarks/references/milo_02_keyframes/shot_01_milo_80s_v3_seed45_fc6b48b7.png",
+  "sha256": "f244ce9d03db35d3dd9288292d541b886ecf45a274862c6d96a62bbbcfb3a966",
+  "original_file": "outputs/keyframes/milo_02/shot_01_start/milo_80s_v3_seed45_fc6b48b7.png",
+  "origin": "generated on this machine by scripts/make_keyframes.py under a style lock",
+  "keyframe_record": {
+    "keyframe_version": 1,
+    "trailer_id": "milo_02",
+    "request": {
+      "lock_id": "milo_80s_v3",
+      "keyframe_id": "shot_01_start",
+      "positive": "style of 80scartoon, thick black ink outlines, flat cel-shaded colors, a huge full moon in a dark teal night sky above a gloomy forest of old leafless gnarled trees with hollow trunks, drifting mist between the trunks, wide establishing shot, hand-painted background, warm moonlight, muted deep blue and teal palette, film grain, no text or watermarks",
+      "negative": "photorealistic, 3d render, blurry, deformed hands, extra fingers, text, watermark, signature, ugly, creepy, scary, skeleton, zombie, distorted face, monster teeth, wrinkles, veins, aggressive expression, evil, sheet, clothing, dress, cloth, hood, bow, ghost, character, person, animal",
+      "width": 1280,
+      "height": 704,
+      "seed": 45,
+      "reference_image": null,
+      "reference_region": null
+    },
+    "key": "fc6b48b7",
+    "lock": {
+      "lock_id": "milo_80s_v3",
+      "steps": 25,
+      "cfg": 6.0,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras",
+      "loras": [
+        {
+          "file": "civitai_80scartoon_sdxl.safetensors",
+          "sha256": "6a7d2e248256d66524571fc1f2757fab5fe6b315fb78ed718a269c223ed87c64",
+          "strength": 1.0
+        }
+      ],
+      "ipadapter": null
+    },
+    "model_sha256": {
+      "sd_xl_base_1.0.safetensors": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b",
+      "civitai_80scartoon_sdxl.safetensors": "6a7d2e248256d66524571fc1f2757fab5fe6b315fb78ed718a269c223ed87c64"
+    },
+    "png_sha256": "f244ce9d03db35d3dd9288292d541b886ecf45a274862c6d96a62bbbcfb3a966",
+    "seconds": 14.3,
+    "made_at": "2026-10-06T20:19:41+0200"
+  },
+  "imported_at": "2026-10-06T18:22:01.415380+00:00"
+}

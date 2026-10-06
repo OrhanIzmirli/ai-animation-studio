@@ -1,0 +1,206 @@
+# MILO: THE LOST LITTLE GHOST - trailer shot list. 30 seconds, 8 shots.
+#
+# From the owner's script of 2026-10-06 (five scenes). Scene 3, the montage,
+# is three short shots; scene 5 is a title card made in editing (generated
+# text would be garbled). Narration and music are in each shot's notes; they
+# are not produced by anything in this repository yet.
+#
+# The look comes from the style lock configs/style_locks/milo_80s_v1.yaml.
+#
+# Planning data only. Keyframes (the start frame of each generated shot):
+#   trailers/milo_01/keyframes.yaml -> scripts/make_keyframes.py --trailer milo_01
+# Assembly once clips exist:
+#   scripts/assemble_trailer.py --trailer milo_01
+# Every shot is a DRAFT until a human sets "status: ready".
+
+trailer_id: milo_01
+working_title: "MILO: THE LOST LITTLE GHOST"
+status: draft
+fps: 24
+resolution: {width: 1280, height: 704}
+total_duration_seconds: 30
+
+# Not decided: the LoRA already gives the cel-and-film look, and a style
+# layer profile on top may hurt it. retro_cel_v3 is a placeholder until one
+# clip has been compared with and without it.
+artist_profile: retro_cel_v3
+
+character: MILO
+
+shots:
+  # --- Scene 1 [00:00-00:05]: a gloomy beginning ---
+  - id: shot_01
+    name: The forest under the moon
+    source: generated
+    duration_seconds: 5
+    needs_character_keyframe: false
+    status: draft
+    camera: slow downward tilt from the full moon through drifting mist into the forest
+    motion:
+      - mist drifts slowly between the trees
+      - bare branches sway in the wind
+    prompt: >-
+      1980s hand-painted cartoon background, night. A huge full moon in a dark
+      teal sky above a gloomy forest of old, leafless, hollow trees. Mist
+      drifts slowly between the trunks and the bare branches sway in the wind.
+      The camera tilts slowly down from the moon into the forest. Muted deep
+      blue and teal palette, warm moonlight, film grain.
+    negative_prompt: >-
+      photorealistic, 3d render, modern digital art, text, watermark, people,
+      characters
+    fade_in_seconds: 0.5
+    clip: {run: milo_01_shot_01/20261006T172305Z-d7cacf2d}
+    notes: |
+      Music: deep, mysterious analog synthesizer melody begins.
+      Narration (1980s trailer voice): "Deep in this shadowy forest, a forgotten secret is hidden..."
+
+  # --- Scene 2 [00:05-00:12]: meet Milo ---
+  - id: shot_02
+    name: Eyes in the hollow
+    source: generated
+    duration_seconds: 3
+    needs_character_keyframe: true
+    status: draft
+    camera: slow push-in toward the dark hollow of a huge old tree
+    motion:
+      - two large turquoise eyes open in the dark hollow and blink
+    prompt: >-
+      1980s hand-painted cartoon, night. The dark hollow of a huge old tree in
+      moonlight. Inside the black hollow, two large round friendly turquoise
+      eyes open, glow softly and blink. The camera pushes in slowly. Film
+      grain, muted teal palette.
+    negative_prompt: >-
+      photorealistic, 3d render, scary, monster, teeth, text, watermark
+    clip: {run: milo_01_shot_02/20261006T172730Z-1d8c5e2e}
+    notes: |
+      Music: turns suddenly soft, cute and magical (bells, light flute).
+      Narration: "...but this secret is not as scary as you think!"
+
+  - id: shot_03
+    name: Milo floats out
+    source: generated
+    duration_seconds: 4
+    needs_character_keyframe: true
+    status: draft
+    camera: static medium-wide shot
+    motion:
+      - Milo floats out of the hollow, arms wide open, smiling
+      - his body glows softly
+    prompt: >-
+      1980s cartoon cel animation. A cute friendly pale blue-white ghost with
+      large turquoise eyes floats out of the hollow of a huge old tree at
+      night, arms wide open, smiling, his wispy tail trailing behind him. His
+      body glows softly. Static camera. Painted forest background, film grain.
+    negative_prompt: >-
+      photorealistic, 3d render, scary, creepy, legs, feet, text, watermark
+    clip: {run: milo_01_shot_03/20261006T173026Z-eee0cb3f}
+    notes: |
+      Narration: "Meet Milo."
+
+  # --- Scene 3 [00:12-00:20]: adventure and danger (montage) ---
+  - id: shot_04
+    name: Milo flies
+    source: generated
+    duration_seconds: 2
+    needs_character_keyframe: true
+    status: draft
+    camera: tracking shot alongside Milo
+    motion:
+      - Milo flies happily through the night air
+    prompt: >-
+      1980s cartoon cel animation. A cute pale blue-white ghost flies happily
+      through the night sky above a dark forest, arms stretched forward, full
+      moon behind him. Painted background, film grain.
+    negative_prompt: >-
+      photorealistic, 3d render, legs, feet, text, watermark
+    clip: {run: milo_01_shot_04/20261006T173402Z-2f7921aa}
+    notes: |
+      Music: tempo rises; 1980s drums and retro synthwave come in.
+      Narration: "Dark forces are after him..."
+
+  - id: shot_05
+    name: The shadow hand
+    source: generated
+    duration_seconds: 3
+    needs_character_keyframe: true
+    status: draft
+    camera: static, Milo in the foreground
+    motion:
+      - a black shadow hand with long fingers reaches toward Milo from behind
+      - Milo looks back, eyes wide in surprise, and darts away
+    prompt: >-
+      1980s cartoon cel animation, night forest. A cute pale blue-white ghost
+      floats in the foreground; behind him a huge black shadow hand with long
+      fingers slowly reaches out of the darkness toward him. He looks back
+      with wide surprised eyes and darts away. Painted background, film grain.
+    negative_prompt: >-
+      photorealistic, 3d render, gore, blood, text, watermark
+    clip: {run: milo_01_shot_05/20261006T173611Z-a6fca66b}
+
+  - id: shot_06
+    name: Into the castle
+    source: generated
+    duration_seconds: 3
+    needs_character_keyframe: true
+    status: draft
+    camera: static wide shot of the castle wall
+    motion:
+      - Milo flies through the broken window of an old castle and disappears inside
+    prompt: >-
+      1980s hand-painted cartoon, night. An old ruined castle under the full
+      moon; a small pale blue-white ghost flies through a broken window and
+      disappears inside. Static camera. Muted teal palette, film grain.
+    negative_prompt: >-
+      photorealistic, 3d render, text, watermark
+    clip: {run: milo_01_shot_06/20261006T173900Z-1ad45e45}
+    notes: |
+      Narration: "...but Milo's heart is bigger than any fear!"
+
+  # --- Scene 4 [00:20-00:25]: friendship ---
+  - id: shot_07
+    name: The kitten
+    source: generated
+    duration_seconds: 5
+    needs_character_keyframe: true
+    status: draft
+    camera: static medium shot, moonlit room
+    motion:
+      - Milo reaches out his little hand to a frightened kitten in the corner
+      - the kitten rubs against his hand
+      - Milo looks at the camera and winks
+    prompt: >-
+      1980s cartoon cel animation. Inside a moonlit castle room, a cute pale
+      blue-white ghost slowly reaches out his little hand toward a small
+      frightened kitten crouching in the corner. The kitten rubs against his
+      hand; the ghost looks at the camera and winks. Moonlight through a tall
+      window, stone walls. Painted background, film grain.
+    negative_prompt: >-
+      photorealistic, 3d render, scary, legs, feet, text, watermark
+    clip: null
+    notes: |
+      Music: warm, epic melody reaches its peak.
+      Narration: "This autumn, courage comes from the most unexpected place."
+
+  # --- Scene 5 [00:25-00:30]: logo and close ---
+  - id: shot_08
+    name: Title
+    source: title_card
+    duration_seconds: 5
+    needs_character_keyframe: false
+    status: draft
+    camera: static
+    motion: []
+    prompt: null
+    negative_prompt: null
+    title_card:
+      text: "MILO: THE LOST LITTLE GHOST"
+      subtitle: Coming this Saturday Morning
+    fade_out_seconds: 1.0
+    clip: null
+    notes: |
+      Planned look: black screen, a glowing retro logo in turquoise and orange
+      with back light; Milo drifts past behind it like a small flame; the
+      subtitle in handwriting. The background plate is keyframe
+      shot_08_plate (keyframes.yaml); the logo is made in editing.
+      Music: classic 1980s cartoon end-credits tune and a narrator's laugh.
+      Narration: "Milo... coming soon to your screens!"
