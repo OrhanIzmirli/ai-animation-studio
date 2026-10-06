@@ -1,0 +1,92 @@
+# Spike: Wan 2.2 TI2V-5B Turbo clips from SDXL-pipeline keyframes
+
+Date: 2026-10-06. Laptop: RTX 4060 Laptop 8 GB, 15.7 GB RAM, ComfyUI
+v0.38.2, the Wan Turbo Q8_0 GGUF already installed for the benchmark runs.
+Script: `spikes/wan_video_spike.py`. Outputs: `spikes/output/wan_video/<tag>/`
+(git-ignored): `out.mp4`, the preprocessed start frame, `contact_sheet.png`
+(8 frames spread over the clip), `report.json`, `comfyui.log`.
+
+Feasibility only. The clips go through the project's own backend
+(`wan-ti2v-5b-turbo-comfyui`, the same code path as the benchmark runner) but
+nothing is recorded under `outputs/` or `benchmarks/`. Judgements are mine,
+from the 8-frame contact sheets, not from watching the clips in motion.
+
+## Keyframes used
+
+Both made by the pipeline locked in `spikes/SDXL_IPADAPTER_SPIKE.md`
+(SDXL base + 600-step character LoRA + IP-Adapter 0.4 "ease out"), at
+1280x704 so the video backend has nothing to crop:
+
+- `spikes/output/sdxl_ipadapter/sdxl_ipadapter_pipe_bench_1280b.png`: the
+  bench scene, one figure, three-quarter view, seed 43. The first 1280x704
+  try (`..._pipe_bench_1280.png`, seed 42) drew **two** young men side by side
+  and a dark-red jacket; a wide frame invites SDXL to duplicate the figure.
+  "(a single person:1.3)" plus "two people, duplicate" in the negative prompt
+  fixed it on the second try.
+- `spikes/output/sdxl_ipadapter/sdxl_ipadapter_pipe_shot06_start.png`: the
+  shot_06 start (from behind on the rooftop ledge), from the earlier scene
+  test.
+
+The square 1024x1024 bench images were not used: the backend scales to cover
+and centre-crops, which would have cut the head off.
+
+## Settings
+
+Turbo defaults as recorded by the backend: 4 steps, CFG 1 (the negative
+prompt has no effect at CFG 1, the backend says so in a warning), uni_pc /
+simple, shift 8, 1280x704, 24 fps, tiled VAE decode. 2 seconds requested,
+which the backend turns into 49 frames (4n+1). Seed 42. Resolution cannot be
+lowered: the backend accepts only the model's native 1280x704 / 704x1280.
+
+## Results
+
+| Clip | Time | Peak VRAM | RAM available before / lowest | What the frames show |
+|---|---|---|---|---|
+| `bench_2s/out.mp4` | prepare 30 s (ComfyUI start + model checks), generate 101 s (ComfyUI 97 s) | 7,103 MiB | 9.8 GB / 0.24 GB | The man sits still on the bench, breathes, turns his head a little toward the camera at the end. Jacket, straps, hair, bench and trees stay the same in all 8 frames. No artefact visible at contact-sheet size |
+| `shot06_2s/out.mp4` | prepare 55 s, generate 102 s | 7,135 MiB | 9.9 GB / 0.02 GB | The figure stays crouched and lifts one hand towards his head (the start of pulling the hood up); he does not rise or stand within 2 s. Hair, jacket, backpack and city stay consistent. The ledge and the near wall shift and grow between frames, and the figure drifts slightly larger: the architecture is not stable |
+
+For scale: the recorded 5-second (121-frame) Turbo runs of the benchmark took
+about 5 minutes each; 2 seconds took 1.7 minutes here.
+
+## Reading
+
+- **Character consistency through motion: yes, on both clips.** Nothing
+  morphs on the figure itself at this length and amount of motion; the
+  clothes and the backpack keep their shape and colours, the hair stays
+  curly and dark.
+- **Artefacts:** none on the bench clip at contact-sheet size. On the
+  rooftop clip the static architecture moves (ledge, wall), the one defect
+  worth a closer look in motion.
+- **Motion follows the prompt only in part:** the small motions (head turn,
+  hand to the hood) happen; the large one (standing up) does not within
+  2 seconds, which matches what the E1 experiments found for Turbo at
+  5 seconds (`docs/experiments/E1_REPORT.md`).
+- **The SDXL keyframes are accepted as start frames without change**: 1280x704
+  PNGs needed no resize or crop, and the backend's preprocessing list is
+  empty.
+- **Memory:** VRAM peaks at 7.1 GB of 8.2 GB, the same as the benchmark runs.
+  **RAM is the limit**: available RAM fell to 0.24 GB and then 0.02 GB
+  although about 10 GB was free before each clip (the 6.3 GB text encoder
+  and the 5 GB GGUF both pass through RAM). Neither clip failed, but a
+  browser or a second heavy process beside this would. This is the same
+  finding as the overnight E1 runs.
+
+## Not done
+
+- Not watched in motion; frame-by-frame judgement from 8 frames only.
+- No quality metrics were computed (`measure_run.py` works on recorded runs;
+  these are not recorded).
+- One seed, one length (2 s), Turbo only. The base model (20 steps, CFG 5)
+  was not tried: it took 17 minutes for 5 s in E1 and would need about
+  7 minutes here.
+- The style layer (`comic_finish_v3`) was not applied.
+
+## What this means for the trailer
+
+The chain "SDXL keyframe -> Wan Turbo clip" runs end to end on this laptop at
+about 2 minutes per 2-second clip, and the character survives the motion.
+The weak points are upstream (the keyframes: jacket colour, detail shots,
+scene lighting, see the SDXL spike) and in Wan's handling of static
+architecture and large motions. The next sensible check is a 5-second clip
+of the bench keyframe through the benchmark runner, so it gets metrics and
+a record like the E1 runs.
