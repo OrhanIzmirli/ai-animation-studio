@@ -1,97 +1,106 @@
 # AI Animation Studio
 
-A long-term project to build a **self-correcting AI production pipeline** for
-animation and video, eventually capable of producing high-quality anime
-trailers and episodes.
+An **experimental hobby project**: can a single laptop (RTX 4060, 8 GB VRAM)
+make a short, watchable animated teaser with open models? The repository is a
+lab notebook as much as a codebase: every run, setting and failure is
+recorded, and the documents under `docs/` describe what was tried and what
+came out of it.
 
-## Long-term architecture
+The current result is a 25-second, 1920×1056 teaser starring **Milo**, a small
+friendly ghost, in a 1980s cel-cartoon look.
+
+## What was tried
+
+1. **A benchmark harness for video models.** Fixed benchmark definitions
+   (YAML), a runner that records every run as JSON (seed, steps, model
+   versions, machine), ffprobe checks on every output, and automatic video
+   metrics ([docs/PHASE_1_BENCHMARK.md](docs/PHASE_1_BENCHMARK.md),
+   [docs/QUALITY_METRICS.md](docs/QUALITY_METRICS.md)).
+2. **Image-to-video with Wan 2.2 TI2V-5B**, first on a cloud GPU, then
+   locally through ComfyUI with the Turbo (distilled, GGUF) model
+   ([docs/BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md](docs/BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md),
+   [docs/experiments/E1_REPORT.md](docs/experiments/E1_REPORT.md)).
+3. **Locked, reproducible keyframes with SDXL**: a style LoRA, IP-Adapter
+   with a region mask for character identity, and a "style lock" file that
+   pins every setting and prompt block, so that an approved image can be
+   regenerated pixel for pixel
+   ([configs/style_locks/](configs/style_locks/)).
+4. **A deterministic style layer**: timing on twos, palette, ink lines,
+   halftone and grain as plain post-processing
+   ([docs/STYLE_LAYER.md](docs/STYLE_LAYER.md)).
+5. **Code-driven cut-out animation**: the final approach (below).
+
+## What was learned
+
+**Why Wan was dropped.** On this hardware, Wan 2.2 Turbo clips looked
+promising on a contact sheet but did not hold up in motion:
+
+- the character changed from shot to shot; extra legs and hands appeared;
+- colours drifted (saturation rises after the first frame) and the face was
+  rendered in a different style from the rest of the picture;
+- the camera drifted even when the prompt asked for a static shot. The Turbo
+  model runs at CFG 1, so camera wording in the prompt is a very weak lever
+  ([docs/experiments/L1_CAMERA_CONTROL.md](docs/experiments/L1_CAMERA_CONTROL.md));
+- vague words become objects (a "mist" turned into a pink balloon);
+- RAM, not VRAM, was the real limit: the text encoder and the model both pass
+  through system memory.
+
+The automatic metrics caught camera instability and global colour shifts,
+but none of the problems that actually ruined the clips (malformed hands,
+inconsistent faces). They measure change between frames, not whether a frame
+is good ([docs/experiments/L0_CALIBRATION.md](docs/experiments/L0_CALIBRATION.md)).
+
+**The switch to code-based animation.** In the final pipeline, generative
+models only make **still images**; all **motion** is written in code, in the
+spirit of 1980s cel animation (painted background plus a separate character
+layer):
 
 ```
-Input / Creative Intent
-  → Generation
-  → Quality Evaluation
-  → Error Diagnosis
-  → Local Repair
-  → Re-evaluation
-  → Final Output
+SDXL + style LoRA      → one character drawing (front view) + painted backgrounds
+Real-ESRGAN            → 4× upscale of every plate
+Depth-Anything-V2      → depth map per background (2.5D parallax camera)
+ai_studio.puppet       → Milo as a puppet: body and two arm layers, a face drawn
+                         every frame, cloth-like bend, squash and stretch
+make_milo_teaser*.py   → acting, timing and camera in world coordinates;
+                         cel shading, motion blur, bloom, film grain
+Kokoro-82M + numpy     → narration, synthesized sound effects, music and ambience
 ```
 
-Instead of regenerating a whole clip when something is wrong, the pipeline
-evaluates the output, diagnoses what failed and where, repairs only that part,
-and evaluates again. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and
-[docs/ROADMAP.md](docs/ROADMAP.md).
+The character never breaks, because it is always the same drawing, and the
+motion does what was planned. That is where the quality jump came from. The
+full write-up (in Turkish) is in [docs/MILO_PIPELINE.md](docs/MILO_PIPELINE.md).
 
-## Current status: Phase 1C — Measured benchmark outputs
-
-The benchmark infrastructure (1A: backend interface, runner, YAML definitions,
-human evaluation schema) covers video editing and video generation (1B). In 1C
-the runner measures every output video with ffprobe and enforces a
-benchmark's pinned fps and duration instead of trusting what the backend
-reports. The first real adapter, Wan 2.2 TI2V-5B (image-to-video), is
-implemented; its first successful run on a real GPU is a 2-step smoke test,
-not a full-quality result
-([docs/BACKEND_WAN_TI2V_5B.md](docs/BACKEND_WAN_TI2V_5B.md)); the editing
-candidates are still placeholders.
-See [docs/PHASE_1_BENCHMARK.md](docs/PHASE_1_BENCHMARK.md).
-
-Running a benchmark on a cloud GPU (Camber, free L4 node), step by step from
-Windows: [docs/RUNNING_ON_CAMBER.md](docs/RUNNING_ON_CAMBER.md).
-Running locally on an 8 GB GPU with the Turbo model through ComfyUI:
-[docs/BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md](docs/BACKEND_WAN_TI2V_5B_TURBO_COMFYUI.md).
-Automatic video metrics (measurements only, no thresholds yet):
-[docs/QUALITY_METRICS.md](docs/QUALITY_METRICS.md).
-Hand-made finish as deterministic post-processing (artist profiles):
-[docs/STYLE_LAYER.md](docs/STYLE_LAYER.md).
-
-> No modification is considered an improvement until it beats the previous
-> version on the fixed benchmark suite.
-
-## Phase 0 — Engineering foundation
-
-Phase 0 contains **no AI models**. It provides:
-
-- the project layout for the future pipeline stages (`src/ai_studio/`)
-- a benchmark result schema and a JSON logger (`src/ai_studio/benchmarking/`)
-- placeholder quality configuration (`configs/quality.yaml`, no thresholds yet)
-- unit tests
+Limits: Milo exists only as a front view (no profile, no turn-around, no lip
+sync), and the music is simple synthesis.
 
 ## Layout
 
 ```
 src/ai_studio/
-  generation/     capability contracts, requests, placeholder adapters
-  segmentation/   masks / regions to preserve or repair (future)
-  tracking/       tracking regions across frames (future)
-  quality/        automatic video metrics (no thresholds yet)
+  benchmarking/   result schema, logger, environment capture, benchmark runner
+  generation/     backend contracts and adapters (Wan 2.2, ComfyUI, fake)
+  keyframes/      style locks and locked SDXL keyframe generation via ComfyUI
+  puppet.py       cut-out puppet rig for the code-driven animation
   post/           style layer: timing, palette, ink, halftone, grain (CPU only)
-  repair/         local repair (future)
-  pipeline/       orchestration of the stages (future)
-  media_probe.py  measures output videos with ffprobe
-  benchmarking/   schemas, logger, environment capture, runner (Phase 0-1C)
-benchmarks/
-  definitions/    fixed benchmark definitions (YAML)
-  inputs/         original input files — never modified
-  references/     reference assets (character sheets, style refs, ...)
-  results/        one JSON file per run (success or failure) — never overwritten
-  evaluations/    human ratings (editing), one file per evaluator and revision
-  comic_evaluations/  experimental comic ratings (generation)
-  metrics/        automatic video metrics, one file per run and metrics version
-configs/          configuration (quality thresholds; comfyui.example.yaml for the
-                  local ComfyUI backend, copied to a git-ignored *.local.yaml)
-spikes/           throwaway feasibility experiments and their reports
-scripts/          run_benchmark.py (CLI), make_bundle / collect_run / import_run,
-                  camber_setup / camber_run
-requirements/     exact package pins per cloud environment
+  quality/        automatic video metrics
+  story/          story / character bible and shot plan (skeleton)
+  trailer/        trailer shot lists and assembly
+benchmarks/       definitions, run results, metrics, human ratings, provenance
+configs/          configuration and style locks
+trailers/         shot lists for the trailers (milo_01 to milo_03)
+scripts/          command-line tools (benchmarks, keyframes, teaser, audio)
+spikes/           short feasibility experiments and their reports
+docs/             design notes, experiment reports, research
 tests/            unit tests
-docs/             architecture and roadmap
-outputs/          generated media (git-ignored)
 ```
+
+Model weights and generated media (`outputs/`, videos, reference images) are
+not in the repository.
 
 ## Setup
 
-Requires Python 3.11. Benchmarks that pin fps or duration also need `ffprobe`
-(FFmpeg) on `PATH`; the tests that use the real ffmpeg/ffprobe are skipped
-when it is missing.
+Requires Python 3.11. Tests that use the real ffmpeg/ffprobe are skipped
+when they are not on `PATH`.
 
 ```bash
 py -3.11 -m venv .venv
@@ -100,42 +109,18 @@ pip install -e ".[dev]"
 pytest
 ```
 
-## Logging a benchmark run
+Image generation needs a local ComfyUI install (see
+`configs/comfyui.example.yaml`) and the model files listed in
+[docs/MILO_PIPELINE.md](docs/MILO_PIPELINE.md).
 
-```python
-from ai_studio.benchmarking import BenchmarkLogger, BenchmarkResult, Resolution, new_run_id
+## Ground rules the project kept
 
-logger = BenchmarkLogger("benchmarks/results")
-logger.log(BenchmarkResult(
-    benchmark_id="phase1-baseline",
-    run_id=new_run_id(),
-    model="some-model", model_version="1.0", workflow_version="wf-1",
-    seed=42, inference_steps=30, guidance=5.0,
-    model_parameters={"sampler": "euler", "scheduler": "karras", "denoise_strength": 1.0},
-    environment={"os": "Windows 11", "python_version": "3.11.9", "git_commit": "abc1234"},
-    prompt="a girl running through a field",
-    resolution=Resolution(width=1280, height=720), fps=24, frame_count=81,
-))
-# -> benchmarks/results/phase1-baseline/<run_id>.json
-```
-
-Generic fields (`seed`, `guidance`, `gpu`, ...) are for querying across
-backends. Backend-specific settings go in `model_parameters`; the machine and
-software versions go in `environment`. Neither dict has a fixed shape, so no
-single model's fields are hardcoded into the schema.
-
-Relative paths anywhere in the project are relative to the project root, not
-the current directory (override with `AI_STUDIO_ROOT`).
-
-## Engineering rules
-
-- Generation backends must be replaceable; quality evaluators must be modular.
-- Every experiment must be reproducible; model parameters are always logged.
-- Benchmark results are never overwritten. Original input files are never modified.
-- Quality is more important than generation speed.
-- One architectural change at a time, and benchmark it.
-- No premature UI, agents or over-engineering.
+- Every experiment is reproducible; model parameters are always logged.
+- Results are never overwritten; inputs are never modified.
+- A change counts as an improvement only when it beats the previous version
+  on the same benchmark.
 
 ## License
 
-License: Apache 2.0, see [LICENSE](LICENSE).
+Apache 2.0, see [LICENSE](LICENSE). Third-party models used by the pipeline
+keep their own licences.

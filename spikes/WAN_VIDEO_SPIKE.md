@@ -69,7 +69,7 @@ about 5 minutes each; 2 seconds took 1.7 minutes here.
   although about 10 GB was free before each clip (the 6.3 GB text encoder
   and the 5 GB GGUF both pass through RAM). Neither clip failed, but a
   browser or a second heavy process beside this would. This is the same
-  finding as the overnight E1 runs.
+  finding as the E1 runs.
 
 ## Not done
 

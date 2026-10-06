@@ -11,7 +11,7 @@ on those facts. **Estimate** = my judgement, no source. **UNVERIFIED** = not
 found or not checked. No recommendation is final; the choice is the owner's.
 
 This builds on `docs/research/IMAGE_BACKENDS.md` (section 4, written
-2026-10-05 by terminal B), which left SDXL's fit, speed and identity quality
+2026-10-05), which left SDXL's fit, speed and identity quality
 on 8 GB unverified.
 
 ## Summary
@@ -59,8 +59,8 @@ Facts and sources:
   The single file `DreamShaperXL1.0Alpha2_fixedVae_half_00001_.safetensors`
   (6.94 GB) is in [Lykon/DreamShaper](https://huggingface.co/Lykon/DreamShaper/tree/main),
   whose licence tag is `other`. UNVERIFIED: which terms apply to that file.
-- C: all figures are from `IMAGE_BACKENDS.md` section 4a and 4d (read by
-  terminal B today, not re-opened by me), except: klein supports
+- C: all figures are from `IMAGE_BACKENDS.md` section 4a and 4d (not
+  re-opened here), except: klein supports
   "text-to-image, single image editing, and multi-reference generation"
   and runs "in about 8GB of VRAM" (Secondary:
   [comfy.org FLUX workflows](https://comfy.org/workflows/model/flux/)).

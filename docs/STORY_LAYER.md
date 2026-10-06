@@ -1,6 +1,6 @@
 # Story / director layer
 
-Status: **skeleton** (2026-10-05, branch `overnight-c`). Schemas, validators
+Status: **skeleton** (2026-10-05). Schemas, validators
 and a shot-to-request converter exist and are tested. Nothing in this layer
 generates an image or a video, and nothing in the rest of the engine calls it
 yet.
@@ -214,7 +214,8 @@ that is measured, a shot can carry a hand-written `prompt`.
 ## How the director fills these files
 
 The intended division of work: the human owns the story, the taste and every
-`ready` decision; the director writes and maintains the three files and keeps them consistent; the engine generates. The director never generates images here
+`ready` decision; the director writes and maintains the three files and keeps
+them consistent; the engine generates. The director never generates images here
 (image generation is manual in the Gemini app for now) and never marks
 anything `ready`.
 
@@ -258,13 +259,12 @@ Things the director must not do: set any `status` to `ready`; invent hashes,
 measurements or file contents; describe features that no reference shows;
 use names, likenesses or signature designs from existing franchises.
 
-## Relation to the trailer shot list (branch `overnight-b`)
+## Relation to the trailer shot list
 
-Terminal B's branch adds `src/ai_studio/trailer/shotlist.py` and
-`trailers/trailer_01/shotlist.yaml`. The two do different jobs and were
-written independently on the same night:
+`src/ai_studio/trailer/shotlist.py` and `trailers/trailer_01/shotlist.yaml`
+do a different job from the story layer; the two were written independently:
 
-| | Trailer shot list (B) | Story layer (C) |
+| | Trailer shot list | Story layer |
 |---|---|---|
 | Purpose | **Assemble** a trailer: which finished clip plays for each shot, fades, title cards | **Plan** before generation: story, characters, assets by hash, keyframe requirements |
 | Shot fields | `camera`, `motion`, `prompt`, `clip`, `needs_character_keyframe: true/false` | `shot_type`, `camera`, `motion`, `action`, `characters`, `keyframes` (by hash), `continuity` |
@@ -272,22 +272,20 @@ written independently on the same night:
 
 They overlap in `id`, `name`, `camera`, `motion`, `duration_seconds`,
 `prompt`, `negative_prompt` and `status`, and both require whole-frame
-durations. Nothing connects them yet. **Decision for the human** (also in
-`docs/OVERNIGHT_LOG_C.md`): either keep both and generate the trailer's shot
+durations. Nothing connects them yet. **Open decision:** either keep both and generate the trailer's shot
 list entries from a shot plan, or fold the story layer's extra fields into
 the trailer shot list. Until then, a trailer's shots would have to be kept in
 step by hand in two files.
 
 ## Not done yet
 
-- No command-line entry point (adding one means editing `cli.py`, which this
-  branch was not allowed to touch).
+- No command-line entry point.
 - No link from a shot to the benchmark run or clip that realised it.
 - No title-card or non-generated shots (the trailer shot list has these).
 - No transitions between shots, no audio, no dialogue.
 - The composed prompt is untested against a model (see above).
-- Image requests: branch `overnight-b` adds an image-generation contract
-  (`generation/image.py`). Turning a `missing` keyframe into such a request is
-  the natural next converter, once that branch is merged.
+- Image requests: `generation/image.py` has an image-generation contract.
+  Turning a `missing` keyframe into such a request is the natural next
+  converter.
 - Multi-keyframe conditioning (for example an end frame) has no role here,
   because no current backend declares support for it.
