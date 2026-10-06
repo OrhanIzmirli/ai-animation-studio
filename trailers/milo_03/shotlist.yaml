@@ -1,0 +1,65 @@
+# MILO - 15-second teaser, third version: cut-out (cel) animation.
+#
+# milo_02's clips came from a video model that invented the motion; the owner
+# judged the character animation insufficient. Here the video model is not
+# used: painted plates (SDXL, no character) and Milo's approved drawing cut
+# into parts (body, arms) are composited and animated by
+# scripts/make_milo_teaser.py, like 1980s cel animation (12 drawings a
+# second, held on twos). This file only records the plates and the cut;
+# the timeline is in that script.
+
+trailer_id: milo_03
+working_title: "MILO"
+status: draft
+fps: 24
+resolution: {width: 1280, height: 704}
+total_duration_seconds: 15
+artist_profile: retro_cel_v3    # not applied: the cut-out frames are composited directly
+character: MILO
+
+shots:
+  - id: shot_01
+    name: The forest under the moon
+    source: generated
+    duration_seconds: 3
+    needs_character_keyframe: false
+    status: draft
+    camera: slow push-in
+    motion: []
+    prompt: plate milo_02/shot_01_start seed 45
+    negative_prompt: none (plate)
+    clip: null
+  - id: shot_02
+    name: Milo floats in and waves
+    source: generated
+    duration_seconds: 5.5
+    needs_character_keyframe: false
+    status: draft
+    camera: static
+    motion: [Milo floats in from the right, stops with a squash, blinks, waves]
+    prompt: plate plate_clearing
+    negative_prompt: none (plate)
+    clip: null
+  - id: shot_03
+    name: Milo flies across the sky
+    source: generated
+    duration_seconds: 3.5
+    needs_character_keyframe: false
+    status: draft
+    camera: static
+    motion: [Milo flies across the frame from left to right]
+    prompt: plate plate_sky
+    negative_prompt: none (plate)
+    clip: null
+  - id: shot_04
+    name: Title
+    source: title_card
+    duration_seconds: 3
+    needs_character_keyframe: false
+    status: draft
+    camera: static
+    motion: []
+    prompt: null
+    negative_prompt: null
+    title_card: {text: MILO, subtitle: Coming this Saturday Morning}
+    clip: null

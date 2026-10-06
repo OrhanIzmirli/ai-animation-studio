@@ -1,0 +1,37 @@
+# Background plates for milo_03: the teaser made as cut-out (cel) animation.
+# No character in any plate; Milo is animated on top by scripts/make_milo_teaser.py.
+
+trailer_id: milo_03
+style_lock: milo_80s_v3
+resolution: {width: 1280, height: 704}
+seeds: [42, 43, 44, 45]
+
+keyframes:
+  - id: plate_clearing
+    shot: shot_02
+    character: null
+    scene: >-
+      a moonlit forest clearing at night, old gnarled leafless trees around the
+      edges, soft bare ground, a wide empty open space in the middle of the
+      picture, wide shot, hand-painted background, muted deep blue and teal
+      palette, warm moonlight, film grain
+    negative: ghost, character, person, animal
+
+  - id: plate_sky
+    shot: shot_03
+    character: null
+    scene: >-
+      starry night sky above soft pink and purple clouds, a full moon at the
+      side, wide empty sky in the middle of the picture, hand-painted
+      background, film grain
+    negative: ghost, character, person, animal, buildings
+
+  - id: plate_hollow
+    shot: shot_02
+    character: null
+    scene: >-
+      close view of the trunk of a huge old gnarled tree at night, a large
+      round dark hollow opening in the middle of the trunk, pitch black inside
+      the hollow, moonlight on the rough bark, hand-painted background, muted
+      deep blue and teal palette, film grain
+    negative: ghost, character, person, animal, eyes, face
