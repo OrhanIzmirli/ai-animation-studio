@@ -59,6 +59,7 @@ from ai_studio.generation.backends.wan_ti2v import (
 )
 from ai_studio.generation.request import VideoGenerationRequest
 from ai_studio.generation.result import GenerationResult
+from ai_studio.generation.shot_prompt import fold_shot_controls
 from ai_studio.protection import safe_rmdir, safe_rmtree, safe_unlink
 from ai_studio.system_memory import LowestAvailableRam, available_ram_gb, total_ram_gb
 
@@ -72,7 +73,12 @@ DEFAULTS = {
     "scheduler": "simple",
     "spatial_tile": 512,
     "latent_scale": 1.0,
+    # "ignore": only the prompt reaches the model (every run before this
+    # parameter existed). "prompt": camera_motion, subject_motion and
+    # visual_direction are appended to it (ai_studio.generation.shot_prompt).
+    "shot_controls": "ignore",
 }
+SHOT_CONTROL_MODES = ("ignore", "prompt")
 ALLOWED_BACKEND_PARAMETERS = tuple(DEFAULTS)
 TURBO_GUIDANCE = 1.0
 # Base model: the values of ComfyUI's own template for it.
@@ -305,6 +311,8 @@ class WanComfyUIBackend(VideoGenerationBackend):
             raise ValueError("spatial_tile must be an int between 64 and 4096, divisible by 32")
         if not is_number(settings["latent_scale"]) or not 0 < settings["latent_scale"] <= 10:
             raise ValueError("latent_scale must be a number in (0, 10]")
+        if settings["shot_controls"] not in SHOT_CONTROL_MODES:
+            raise ValueError(f"shot_controls must be one of {SHOT_CONTROL_MODES}")
         if not is_number(settings["guidance_scale"]) or settings["guidance_scale"] < 1:
             raise ValueError("guidance_scale must be a number >= 1")
         for name in ("shift", "latent_scale", "guidance_scale"):
@@ -421,10 +429,11 @@ class WanComfyUIBackend(VideoGenerationBackend):
             name for name in ("camera_motion", "subject_motion", "visual_direction")
             if getattr(request, name) is not None
         ]
-        if unused:
+        if unused and settings["shot_controls"] == "ignore":
             warnings.append(
                 f"{', '.join(unused)} not consumed separately: only the prompt is passed to the model, unchanged"
             )
+        prompt = fold_shot_controls(request) if settings["shot_controls"] == "prompt" else request.prompt
         if request.reference_images:
             warnings.append("reference_images are not used by this backend; only the start_frame conditions the video")
         if self._ram_before_gb is not None and self._ram_before_gb < LOW_RAM_WARNING_GB:
@@ -451,7 +460,7 @@ class WanComfyUIBackend(VideoGenerationBackend):
         output_prefix = f"{OUTPUT_PREFIX}/{run_key}"
         image_name = client.upload_image(Path(conditioning.derived_file), f"ai_studio_{run_key}.png")
         workflow = build_workflow(
-            models=models, image_name=image_name, prompt=request.prompt,
+            models=models, image_name=image_name, prompt=prompt,
             negative_prompt=request.negative_prompt or "", width=width, height=height,
             num_frames=num_frames, seed=request.seed, settings=settings, output_prefix=output_prefix,
         )
@@ -507,6 +516,7 @@ class WanComfyUIBackend(VideoGenerationBackend):
                 "temporal_tile": temporal_tile_for(num_frames),
                 "temporal_tile_overlap": TEMPORAL_TILE_OVERLAP,
                 "encoder": encoder,
+                **({"prompt_sent": prompt} if prompt != request.prompt else {}),
             },
             generation_time_seconds=prompt_seconds,
             environment=environment,

@@ -227,6 +227,7 @@ def test_valid_requests_accepted():
         ({"backend_parameters": {"latent_scale": 0}}, "latent_scale"),
         ({"backend_parameters": {"latent_scale": "0.8"}}, "latent_scale"),
         ({"backend_parameters": {"cpu_offload": True}}, "unknown backend_parameters"),
+        ({"backend_parameters": {"shot_controls": "always"}}, "shot_controls"),
     ],
 )
 def test_invalid_requests_rejected(overrides, match):
@@ -308,7 +309,7 @@ def test_base_backend_identity_and_defaults(comfy_dir):
 
     assert WanBaseComfyUIBackend.defaults == {
         "num_inference_steps": 20, "shift": 8.0, "sampler": "uni_pc", "scheduler": "simple",
-        "spatial_tile": 512, "latent_scale": 1.0, "guidance_scale": 5.0,
+        "spatial_tile": 512, "latent_scale": 1.0, "shot_controls": "ignore", "guidance_scale": 5.0,
     }
     assert WanBaseComfyUIBackend.fixed_guidance is None and WanTurboComfyUIBackend.fixed_guidance == 1.0
 
@@ -755,3 +756,36 @@ def test_cli_without_configuration_exits_2(project, rooftop, monkeypatch, capsys
     out = capsys.readouterr().out
     assert code == 2 and "ComfyUI is not configured" in out and "comfyui.example.yaml" in out
     assert not (project / "benchmarks" / "results").exists()
+
+
+@needs_ffmpeg
+def test_shot_controls_reach_the_prompt_when_asked(project, rooftop, comfy_dir, fake):
+    definition, _ = rooftop
+    with WanTurboComfyUIBackend(make_config(comfy_dir, fake.port)) as backend:
+        record = make_runner(project).run_definition(
+            definition, backend, seed=42, output_resolution=LANDSCAPE, run_id="run-1",
+            backend_parameters={"shot_controls": "prompt"},
+        )
+
+    assert record.status == "success"
+    (queued,) = fake.prompts.values()
+    positive = queued["5"]["inputs"]["text"]
+    assert positive == definition.prompt + "\nCamera: slow cinematic push-in."
+    assert record.model_parameters["shot_controls"] == "prompt"
+    assert record.model_parameters["prompt_sent"] == positive
+    assert record.prompt == definition.prompt  # the record keeps the definition's prompt
+    assert "not consumed separately" not in record.notes
+
+
+@needs_ffmpeg
+def test_shot_controls_are_ignored_by_default(project, rooftop, comfy_dir, fake):
+    definition, _ = rooftop
+    with WanTurboComfyUIBackend(make_config(comfy_dir, fake.port)) as backend:
+        record = make_runner(project).run_definition(
+            definition, backend, seed=42, output_resolution=LANDSCAPE, run_id="run-1",
+        )
+
+    (queued,) = fake.prompts.values()
+    assert queued["5"]["inputs"]["text"] == definition.prompt
+    assert record.model_parameters["shot_controls"] == "ignore"
+    assert "prompt_sent" not in record.model_parameters

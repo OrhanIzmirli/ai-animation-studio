@@ -1,0 +1,87 @@
+# Variant of comic_rooftop_01 with a static camera (Level 1, camera control).
+#
+# Identical to comic_rooftop_01 (same start frame, seed grid, resolution,
+# negative prompt, subject motion, visual direction) except:
+#   - camera_motion: static instead of the slow push-in;
+#   - the prompt's sentence "Slow cinematic camera push-in." is removed, so
+#     the prompt does not contradict the camera control.
+# Meant to be run with --param shot_controls=prompt, which is what brings the
+# shot controls to the model at all (see ai_studio.generation.shot_prompt).
+# comic_rooftop_01 itself is not changed: its runs exist.
+#
+# Paths are relative to the project root.
+# No copyrighted character names, titles, logos or franchise costumes.
+
+benchmark_id: comic_rooftop_01_static_cam
+task_type: video_generation   # new video from text + references; no source video
+status: ready                 # owner's instruction of 2026-10-06: run comic_rooftop_01
+                              # with camera_motion: static, as a new run
+
+# Exact image that conditions frame 0. Original file, never modified.
+#   1672x941 PNG, RGB 8-bit, 2497820 bytes
+#   sha256 3a3e76750196317ee5142d7d6d00d2c68af58a993ee54ca8cc9fa665dbf1e0fb
+# Requires a backend with supports_start_frame. The runner checksums it on
+# every run and records it in record.start_frame.
+start_frame: benchmarks/references/comic_hero_01/rooftop_frame_v001.png
+
+# Additional identity/style references (not the start frame). None yet.
+reference_images: []
+
+prompt: >-
+  Graphic novel style animated shot, hybrid 2D and 3D animation. Seen from
+  behind at a low three-quarter angle, a young man with curly dark hair,
+  wearing dark hooded streetwear with subtle dark-red accents, dark trousers
+  and light sneakers, and carrying a dark backpack with subtle red detailing,
+  sits on the edge of a high rooftop ledge overlooking a dense city at late
+  sunset, city lights beginning to glow. Subtle wind moves his hair and
+  clothing. He stays mostly still, looking out over the city; near the end he
+  slowly turns his head slightly toward the camera. Strong ink contours, controlled cel shading,
+  halftone print texture,
+  hand-drawn hatching in the shadows, layered city background with depth,
+  cinematic perspective, limited stepped animation timing. Consistent
+  character, consistent clothing design, stable architecture.
+
+negative_prompt: >-
+  photorealistic, live action, 3D render look, glossy plastic shading, soft
+  airbrushed gradients, blurry, motion blur smear, flickering lines, boiling
+  line art, morphing face, changing hairstyle, changing clothing, extra limbs,
+  deformed hands, warping buildings, melting architecture, text, logo,
+  watermark, signature, speech bubbles, mask, superhero costume
+
+# --- structured shot controls (generic; backends map them as they can) ---
+
+duration_seconds: 5
+fps: 24
+# Max |measured duration - duration_seconds|; measured = frame_count / fps of
+# the output video (the runner measures it, it does not trust the backend).
+# Models generate frame counts on their own grid (e.g. Wan 4n+1 -> 121 frames
+# = 5.042 s at 24 fps); 0.1 s accepts that but rejects a 4 s or 6 s clip.
+duration_tolerance_seconds: 0.1
+
+camera_motion: static          # a preset of ai_studio.generation.shot_prompt
+
+subject_motion:
+  - character sits on the rooftop ledge and remains mostly stationary
+  - subtle wind moves hair and clothing
+  - near the end, a slight head turn toward the camera
+
+visual_direction:
+  - graphic novel aesthetic
+  - hybrid 2D/3D animation
+  - strong ink contours
+  - controlled cel shading
+  - halftone print texture
+  - hand-drawn hatch details
+  - layered city background
+  - cinematic perspective
+  - intentional limited/stepped animation feel
+  - stable facial structure
+  - stable clothing design
+  - stable background geometry
+
+notes: |
+  start_frame_sha256: 3a3e76750196317ee5142d7d6d00d2c68af58a993ee54ca8cc9fa665dbf1e0fb
+  character: COMIC_HERO_01
+  difficulty_level: 1 (stationary character + static camera)
+  time_of_day: late sunset, city lights starting to glow
+  evaluation: ComicAnimationEvaluation (experimental, 1-10, higher is better)

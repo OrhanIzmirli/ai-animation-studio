@@ -1,0 +1,51 @@
+# Static-camera variant of the recorded run hero01_sdxl_bench_01 /
+# 20261006T004754Z-bc8b8338 (Level 1, camera control).
+#
+# That run was made by spikes/wan_bench_run.py without a definition; it asked
+# for "Static camera." in the prompt and still drifted (the whole frame moves
+# left and grows, motion_mean 5.87; spikes/WAN_VIDEO_SPIKE.md). This
+# definition repeats its request (same keyframe, prompt, negative prompt,
+# 5 s, 1280x704, seed 42 on the command line) and adds only
+# camera_motion: static, to be run with --param shot_controls=prompt.
+# Differences from that run besides the camera control: fps 24 and a
+# duration tolerance of 0.1 s are pinned here (the backend's native fps is 24
+# and it made 121 frames, so neither changes the request sent to the model).
+#
+# Paths are relative to the project root.
+# No copyrighted character names, titles, logos or franchise costumes.
+
+benchmark_id: hero01_sdxl_bench_01_static_cam
+task_type: video_generation
+status: ready                 # owner's instruction of 2026-10-06 (camera control test)
+
+# Keyframe made by the SDXL + character LoRA + IP-Adapter spike; provenance beside it.
+start_frame: benchmarks/references/hero01_sdxl_keyframes/bench_1280b_seed43.png
+
+reference_images: []
+
+prompt: >-
+  Graphic novel style animated shot, hybrid 2D and 3D animation. A young man
+  with curly dark hair in a dark hooded jacket with dark-red backpack straps
+  sits on a park bench in daylight, three-quarter view. He stays mostly
+  still, breathing calmly; a light wind moves his hair and the hem of his
+  jacket; near the end he slowly turns his head toward the camera. Static
+  camera. Strong ink contours, cel shading, halftone texture, limited
+  stepped animation timing. Consistent character, consistent clothing,
+  stable background.
+
+negative_prompt: >-
+  photorealistic, live action, 3D render look, glossy plastic shading, soft
+  airbrushed gradients, blurry, motion blur smear, flickering lines, boiling
+  line art, morphing face, changing hairstyle, changing clothing, extra
+  limbs, deformed hands, text, logo, watermark, signature, speech bubbles,
+  mask, superhero costume
+
+duration_seconds: 5
+fps: 24
+duration_tolerance_seconds: 0.1
+
+camera_motion: static          # a preset of ai_studio.generation.shot_prompt
+
+notes: |
+  character: COMIC_HERO_01 (SDXL-pipeline keyframe)
+  compare with: hero01_sdxl_bench_01/20261006T004754Z-bc8b8338 (no shot controls)

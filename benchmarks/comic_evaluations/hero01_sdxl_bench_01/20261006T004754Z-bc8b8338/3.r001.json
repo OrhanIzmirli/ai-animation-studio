@@ -1,0 +1,19 @@
+{
+  "benchmark_id": "hero01_sdxl_bench_01",
+  "run_id": "20261006T004754Z-bc8b8338",
+  "evaluator": "3",
+  "character_identity": 2,
+  "face_stability": 1,
+  "line_stability": 1,
+  "style_consistency": 2,
+  "background_stability": 1,
+  "motion_quality": 1,
+  "camera_motion": 1,
+  "temporal_consistency": 1,
+  "artifact_visibility": 1,
+  "overall_visual_quality": 2,
+  "notes": "rated file sha256: 227329f1d9a87f409d7aae5e602476f7a508e77365ddab00f01e3f9861b99a5c\nrated on review page hero01_sdxl_bench_01/20261006T152739Z",
+  "revision": 1,
+  "timestamp": "2026-10-06T15:44:13.718051+00:00",
+  "schema_version": 1
+}
